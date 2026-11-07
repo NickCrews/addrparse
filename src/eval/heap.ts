@@ -1,12 +1,18 @@
 /**
  * Peak and total allocation of the V8 heap over a window, from V8's own accounting rather than
- * sampled RSS, so they are stable even for windows of a few milliseconds.
+ * sampled RSS, so they are stable even for windows of a few milliseconds. "Heap" here includes
+ * external memory (ArrayBuffers and typed arrays), where models often keep their weights.
  *
- * Between garbage collections the used heap only grows, so its peak is either the used size
- * just before some collection or the size at the end of the window, and the bytes allocated
- * are the growth between consecutive collections, summed. `v8.GCProfiler` reports the heap
- * statistics before and after every collection in the window. "Heap" here includes external
- * memory (ArrayBuffers and typed arrays), where models often keep their weights.
+ * Heap bytes allocated come from V8's `total_allocated_bytes` counter, which only grows.
+ * External memory has no such counter, so its allocation is the growth between consecutive
+ * collections, summed, from the statistics `v8.GCProfiler` reports before and after each one.
+ *
+ * The peak is the highest used size seen at the window's start, its end, or just before any
+ * collection in it. The used size can also fall between collections: V8 sweeps the pages of a
+ * finished mark-compact lazily and on background threads, and dead objects on a page count as
+ * used until it is swept, so sweeping left over from before the window lowers the used size
+ * inside it. The peak is therefore the rise above the start in V8's used size, which can be
+ * less than what the window itself had live by the bytes that sweeping released.
  */
 import v8 from "node:v8";
 
@@ -22,29 +28,26 @@ interface Stats {
   externalMemory: number;
 }
 const used = (s: Stats) => s.usedHeapSize + s.externalMemory;
-const current = () => {
-  const s = v8.getHeapStatistics();
-  return s.used_heap_size + s.external_memory;
-};
 
 /** Starts a window now; call the returned function to end it. */
 export function startHeapWindow(): () => HeapWindow {
   const profiler = new v8.GCProfiler();
   profiler.start();
-  const start = current();
+  const start = v8.getHeapStatistics();
   return () => {
-    const end = current();
+    const end = v8.getHeapStatistics();
     const gcs = profiler.stop()?.statistics ?? [];
-    let peak = Math.max(start, end);
-    let allocated = 0;
-    let last = start;
+    const startUsed = start.used_heap_size + start.external_memory;
+    let peak = Math.max(startUsed, end.used_heap_size + end.external_memory);
+    let external = 0;
+    let lastExternal = start.external_memory;
     for (const gc of gcs) {
-      const before = used(gc.beforeGC.heapStatistics);
-      peak = Math.max(peak, before);
-      allocated += Math.max(0, before - last);
-      last = used(gc.afterGC.heapStatistics);
+      peak = Math.max(peak, used(gc.beforeGC.heapStatistics));
+      external += Math.max(0, gc.beforeGC.heapStatistics.externalMemory - lastExternal);
+      lastExternal = gc.afterGC.heapStatistics.externalMemory;
     }
-    allocated += Math.max(0, end - last);
-    return { peakOverBaseline: peak - start, allocated };
+    external += Math.max(0, end.external_memory - lastExternal);
+    const heap = end.total_allocated_bytes - start.total_allocated_bytes;
+    return { peakOverBaseline: peak - startUsed, allocated: heap + external };
   };
 }

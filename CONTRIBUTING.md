@@ -116,10 +116,10 @@ and heap from one measurement don't affect another.
 | model load ms             | wall time of `load(bytes)`                                                                                                    |
 | model heap                | heap used after `load`, minus before (both after GC)                                                                          |
 | infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                                                      |
-| infer heap peak           | peak V8 heap + external memory over the same window, minus before                                                             |
+| infer heap peak           | peak V8 heap + external memory over the same window, minus before; low by older garbage V8 sweeps meanwhile                   |
 | train seconds, examples/s | wall time of `train()`, excluding data loading                                                                                |
 | train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                                                   |
-| train heap peak           | peak V8 heap + external memory during `train()`, minus before                                                                 |
+| train heap peak           | peak V8 heap + external memory during `train()`, minus before; low by older garbage V8 sweeps meanwhile                       |
 | train allocated           | V8 heap + external bytes allocated during `train()`, including garbage                                                        |
 | determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                                                 |
 | learning curve            | exact match after training on fewer examples (`full` suite)                                                                   |

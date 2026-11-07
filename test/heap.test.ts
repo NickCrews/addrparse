@@ -22,6 +22,11 @@ test("counts collected garbage in allocated and retained memory in the peak", ()
 
 test("catches a peak that is freed before the window ends", () => {
   const gc = (globalThis as { gc?: () => void }).gc;
+  // The previous test leaves garbage whose sweeping would lower the used size inside the window
+  // and hide part of the peak (see src/eval/heap.ts). A collection finishes any sweeping left
+  // before it starts, so the second one leaves next to nothing to sweep.
+  gc?.();
+  gc?.();
   const end = startHeapWindow();
   let transient: Float64Array | undefined = new Float64Array(4 * MB);
   transient[0] = 1;
