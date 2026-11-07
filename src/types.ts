@@ -62,7 +62,8 @@ export interface TrainResult {
 /**
  * The contract every implementation in `impls/<name>/index.ts` default-exports.
  * Training and inference always run in separate processes and only share `model` bytes,
- * so the serialized size and load cost are part of what gets measured.
+ * so the serialized size and load cost are part of what gets measured. Defining `load` in
+ * `impls/<name>/load.ts` keeps training code out of the measured browser bundle (bundle.ts).
  */
 export interface Impl {
   train(examples: readonly Example[], ctx: TrainContext): TrainResult | Promise<TrainResult>;

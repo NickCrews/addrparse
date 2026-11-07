@@ -3,18 +3,20 @@
  * metrics against the previous run of the same impl, suite and split.
  *
  *   pnpm eval <impl...> [--suite quick] [--split dev|test]
- *                       [--only accuracy,memory,latency,throughput,determinism,curve] [--retrain]
+ *                       [--only accuracy,memory,bundle,latency,throughput,determinism,curve]
+ *                       [--retrain]
  *
  * Each measurement is a fresh child process (child.ts). Models are cached in
  * models/<impl>/<key>.bin, keyed by the impl's source hash, training data hash, seed and size;
- * `--retrain` ignores the cache.
+ * `--retrain` ignores the cache. A cached model carries the training metrics, and when and where
+ * they were measured, from the run that trained it.
  *
  * A reference impl (`ReferenceImpl`, e.g. usaddress) is trained elsewhere and runs out of
  * process, so only its accuracy is measured; `--only` and `--retrain` don't apply to it.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -23,6 +25,7 @@ import { hashSplit, loadExamples } from "../data/load.ts";
 import { MODELS_DIR, PREDICTIONS_DIR, ROOT, type Split } from "../data/paths.ts";
 import type { Example, ReferenceImpl, ScoredParse, Span } from "../types.ts";
 import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
+import { bundleImpl } from "./bundle.ts";
 import type {
   LatencyArgs,
   PredictArgs,
@@ -35,7 +38,15 @@ import { implCodeSize, implSourceHash, importReference, listImpls } from "./impl
 import { c, comparabilityNotes, deltaTable, detailTables, sideBySideTable } from "./report.ts";
 import { loadRuns, saveRun, type RunResult } from "./results.ts";
 
-const STEPS = ["accuracy", "memory", "latency", "throughput", "determinism", "curve"] as const;
+const STEPS = [
+  "accuracy",
+  "memory",
+  "bundle",
+  "latency",
+  "throughput",
+  "determinism",
+  "curve",
+] as const;
 type Step = (typeof STEPS)[number];
 type Training = NonNullable<RunResult["metrics"]["training"]>;
 
@@ -119,16 +130,21 @@ async function ensureModel(impl: string, implHash: string, n: number) {
   const metaPath = join(dir, `${key}.train.json`);
   if (!opts.retrain && existsSync(model) && existsSync(metaPath)) {
     const training = JSON.parse(readFileSync(metaPath, "utf8")) as Training;
+    training.measured ??= { at: statSync(metaPath).mtime.toISOString() };
     return { model, trainHash, training: { ...training, cached: true } };
   }
   mkdirSync(dir, { recursive: true });
   const t0 = now();
   log(`  train ${n.toLocaleString("en-US")} examples …`);
-  const result = await runChild<Omit<Training, "cached">>(
-    "train",
-    { impl, split: "train", n, seed: config.seed, out: model } satisfies TrainArgs,
-    ["--max-old-space-size=16384"],
-  );
+  const measured = { at: new Date().toISOString(), git: gitInfo(), machine: machineInfo() };
+  const result = {
+    measured,
+    ...(await runChild<Omit<Training, "cached" | "measured">>(
+      "train",
+      { impl, split: "train", n, seed: config.seed, out: model } satisfies TrainArgs,
+      ["--max-old-space-size=16384"],
+    )),
+  };
   writeFileSync(metaPath, JSON.stringify(result, null, 2) + "\n");
   log(`  train done in ${secs(t0)}`);
   return { model, trainHash, training: { ...result, cached: false } };
@@ -168,6 +184,16 @@ function gitInfo(): RunResult["git"] {
   };
 }
 
+/** "measured 2026-11-06 18:52 at abc1234 on <cpu>", noting a machine other than this one. */
+function trainingProvenance(t: Training): string {
+  const m = t.measured;
+  if (!m) return "training metrics of unknown age";
+  let s = `training measured ${m.at.slice(0, 16).replace("T", " ")} UTC`;
+  if (m.git?.sha) s += ` at ${m.git.sha.slice(0, 7)}${m.git.dirty ? "+dirty" : ""}`;
+  if (m.machine && m.machine.cpu !== machineInfo().cpu) s += c.yellow(` on ${m.machine.cpu}`);
+  return s + "; --retrain re-measures";
+}
+
 function machineInfo(): RunResult["machine"] {
   return {
     cpu: os.cpus()[0]?.model ?? "unknown",
@@ -175,6 +201,7 @@ function machineInfo(): RunResult["machine"] {
     memoryGB: Math.round(os.totalmem() / 1024 ** 3),
     os: `${os.platform()} ${os.release()}`,
     node: process.version,
+    load: os.loadavg()[0],
   };
 }
 
@@ -261,11 +288,12 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
   const started = new Date();
   const runId = newRunId(impl, started);
   const tImpl = now();
+  const loadAtStart = os.loadavg()[0]!;
   log(c.bold(`${impl}`) + c.dim(` (${runId})`));
 
   const implHash = implSourceHash(impl);
   const main = await ensureModel(impl, implHash, config.trainExamples);
-  if (main.training.cached) log(`  train: cached model`);
+  if (main.training.cached) log(`  train: cached model; ${trainingProvenance(main.training)}`);
   const metrics: RunResult["metrics"] = { training: main.training, code: implCodeSize(impl) };
   const modelArgs: ModelArgs = { impl, split, n: config.evalExamples, model: main.model };
 
@@ -307,6 +335,19 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     const t0 = now();
     metrics.memory = await runChild("memory", modelArgs);
     log(`  memory: load ${metrics.memory!.loadMs.toFixed(1)} ms (${secs(t0)})`);
+  }
+  if (enabled("bundle")) {
+    try {
+      const b = await bundleImpl(impl);
+      metrics.bundle = b;
+      const note = b.includesTraining ? `, includes training code (no ${impl}/load.ts)` : "";
+      log(
+        `  bundle: ${b.bytes.toLocaleString("en-US")} B, gzip ${b.gzipBytes.toLocaleString("en-US")} B${note}`,
+      );
+    } catch (e) {
+      metrics.bundle = { error: e instanceof Error ? e.message : String(e) };
+      log(c.red(`  bundle failed: ${metrics.bundle.error}`));
+    }
   }
   if (enabled("latency")) {
     const t0 = now();
@@ -381,6 +422,8 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     }
   }
 
+  const machine = machineInfo();
+  machine.load = Math.max(loadAtStart, machine.load ?? 0);
   const run: RunResult = {
     runId,
     timestamp: started.toISOString(),
@@ -390,7 +433,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     git: gitInfo(),
     implHash,
     data: { trainHash: main.trainHash, evalHash },
-    machine: machineInfo(),
+    machine,
     metrics,
   };
   const previous = previousRun(run);
@@ -426,7 +469,8 @@ for (const { run, previous } of done) {
   console.log(`\n${c.bold(run.impl)} ${c.dim(run.runId)}`);
   if (!previous) console.log(c.dim("first run of this impl, suite and split"));
   console.log(deltaTable(previous, run));
-  for (const n of previous ? comparabilityNotes([previous, run]) : []) console.log(n);
+  if (run.metrics.training?.cached) console.log(c.dim(trainingProvenance(run.metrics.training)));
+  for (const n of comparabilityNotes(previous ? [previous, run] : [run])) console.log(n);
   const det = run.metrics.determinism;
   if (det) {
     console.log(

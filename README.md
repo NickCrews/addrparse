@@ -19,17 +19,18 @@ pnpm compare                       # latest run of every impl, side by side
 
 ## Commands
 
-| command                                     | does                                                                 |
-| ------------------------------------------- | -------------------------------------------------------------------- |
-| `pnpm eval <impl...> [--suite quick]`       | train (or reuse cached model), measure, save, print vs previous run  |
-| `  --split test`                            | score on the test split instead of dev                               |
-| `  --only accuracy,memory,latency,...`      | run a subset of steps (`throughput`, `determinism`, `curve`)         |
-| `  --retrain`                               | ignore the model cache                                               |
-| `pnpm compare [--suite quick] [--detail]`   | latest run per impl; best value per metric highlighted               |
-| `pnpm compare <impl>`                       | that impl's last two runs, with changes                              |
-| `pnpm compare <runA> <runB>`                | two runs (id, id prefix, impl name, or path)                         |
-| `pnpm errors <run> [--label X] [--slice s]` | misparsed examples as token / gold / predicted tables                |
-| `pnpm data:override <id\|text>...`          | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels |
+| command                                           | does                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm eval <impl...> [--suite quick]`             | train (or reuse cached model), measure, save, print vs previous run     |
+| `  --split test`                                  | score on the test split instead of dev                                  |
+| `  --only accuracy,memory,bundle,...`             | run a subset of steps (`latency`, `throughput`, `determinism`, `curve`) |
+| `  --retrain`                                     | ignore the model cache                                                  |
+| `pnpm compare [--suite quick] [--detail]`         | latest run per impl; best value per metric highlighted                  |
+| `pnpm compare <impl>`                             | that impl's last two runs, with changes                                 |
+| `pnpm compare <runA> <runB>`                      | two runs (id, id prefix, impl name, or path)                            |
+| `pnpm errors <run> [--label X] [--slice s]`       | misparsed examples as token / gold / predicted tables                   |
+| `pnpm noise <impl...> [--suite quick] [--last 5]` | run-to-run spread of each metric vs its noise threshold                 |
+| `pnpm data:override <id\|text>...`                | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels    |
 
 `--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
 or red only when larger than the metric's noise threshold; smaller ones are dimmed.
@@ -56,9 +57,18 @@ example turns on the risk–coverage metrics. `impls/lookup` returns the share o
 training.
 
 Training and inference run in separate processes and share only the model bytes, so
-serialization, size and load cost are part of what is measured. `src/tokens.ts` has a whitespace
-tokenizer and `spansFromTokens` for token-level models; `impls/lookup` uses them. `impls/noop`
-returns nothing: its timings and memory are the harness's own floor.
+serialization, size and load cost are part of what is measured.
+
+`src/tokens.ts` has a whitespace tokenizer and `spansFromTokens` for token-level models;
+`impls/lookup` uses them. `impls/noop` returns nothing: its timings and memory are the
+harness's own floor, so side-by-side tables dim its column and never rank it best.
+
+The bundle-size metric bundles `impls/<name>/load.ts` if it exists, else `index.ts`. esbuild
+can't drop `train` from the exported object, so put `load` and everything it uses in `load.ts`
+(`export function load(model: Uint8Array): Parser`), import it into `index.ts`, and keep
+training-only code out of `load.ts`'s imports; `impls/lookup` does this. Runtime code must not
+import `node:` modules, or the browser bundle fails; esbuild doesn't catch uses of the `Buffer`
+or `process` globals, which fail only in a browser.
 
 ## Reference implementations
 
@@ -98,11 +108,15 @@ and heap from one measurement don't affect another.
 | latency p50/p99, µs/token | one thread, after warmup passes; each `parse` call timed individually                                                         |
 | throughput/s              | N worker threads, each with its own model, parsing back to back for a fixed time; median of repeats                           |
 | model size, gzip          | bytes returned by `train`, raw and gzip -9                                                                                    |
+| bundle size, gzip         | `load.ts` (else `index.ts`) bundled for the browser by esbuild, minified; raw and gzip -9                                     |
 | model load ms             | wall time of `load(bytes)`                                                                                                    |
 | model heap                | heap used after `load`, minus before (both after GC)                                                                          |
 | infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                                                      |
+| infer heap peak           | peak V8 heap + external memory over the same window, minus before                                                             |
 | train seconds, examples/s | wall time of `train()`, excluding data loading                                                                                |
 | train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                                                   |
+| train heap peak           | peak V8 heap + external memory during `train()`, minus before                                                                 |
+| train allocated           | V8 heap + external bytes allocated during `train()`, including garbage                                                        |
 | determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                                                 |
 | learning curve            | exact match after training on fewer examples (`full` suite)                                                                   |
 | code lines                | lines of `impls/<name>/**/*.ts`                                                                                               |
@@ -110,10 +124,18 @@ and heap from one measurement don't affect another.
 Gold NotAddress spans break at `,` and `;` the way `spansFromTokens` does ("Baker, Sandra" is two
 spans), so exact match on junk needs those spans; junk abstained only needs no other label.
 
-Memory caveats: the "over baseline" peaks are sampled every millisecond by a worker thread, so
-spikes shorter than that can be missed. The run JSON also has `peakRssMB`, the OS's maxRSS; that
-covers the whole process lifetime, so it includes Node startup and loading the data,
-and is only meaningful when the model dominates.
+Memory caveats: the RSS "over baseline" peaks are sampled every millisecond by a worker thread, so
+spikes shorter than that can be missed, and they depend on when the OS and GC return pages, so
+they vary run to run. The heap metrics come from V8's accounting before and after each
+garbage collection (`src/eval/heap.ts`), so they're stable even for trainings that take
+milliseconds, but they don't see native memory outside V8. The run JSON also has `peakRssMB`,
+the OS's maxRSS; that covers the whole process lifetime, so it includes Node startup and loading
+the data, and is only meaningful when the model dominates. Training rates are hidden when
+training took under a millisecond, where they measure the timer.
+
+Runs record the machine's 1-minute load average (the higher of its values at the start and end).
+Above the core count, other processes competed for the CPU: `pnpm eval` and `pnpm compare` note
+"machine busy: timings unreliable", and `pnpm noise` leaves the run out.
 
 ## Runs, cache and history
 
@@ -122,67 +144,23 @@ and is only meaningful when the model dominates.
 - `results/predictions/<runId>.jsonl`: per-example predictions, read by `pnpm errors`. Not committed.
 - `models/<impl>/<key>.bin`: trained models. The key hashes the impl's sources plus shared `src/`
   (not `src/eval/`), the training data, seed and size, so any change that could change the model
-  retrains it. A cached model reuses the training metrics from when it was trained;
-  `--retrain` measures training again.
+  retrains it. A cached model reuses the training metrics from when it was trained; the run
+  records when, at which commit and on which machine (`training.measured`), and `pnpm eval`
+  prints it. `--retrain` measures training again.
 
 A run is compared against the previous run of the same impl, suite and split. Runs from different
 suites, data or machines aren't comparable; `compare` prints a note when they differ.
 
 ## Where to tweak
 
-| file                      | controls                                                                                                                                           |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `eval.config.ts`          | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve                                                     |
-| `src/eval/headline.ts`    | which metrics the tables show, their order, format and noise thresholds                                                                            |
-| `src/eval/slices.ts`      | accuracy subsets                                                                                                                                   |
-| `src/data/libpostal.ts`   | sources, US lines fetched per source (`--limit`), their mix in the splits (`--mix`)                                                                |
-| `src/data/refine.ts`      | how libpostal's labels map to the output labels                                                                                                    |
-| `src/data/noise.ts`       | formatting noise added to rendered examples (newlines, "Apt4", typos, …) and its rates; `node src/data/build.ts --noise-scale 0` builds clean data |
-| `src/data/not-address.ts` | synthetic NotAddress examples; rates also via `pnpm data:build --junk-rate R --embedded-rate R`                                                    |
-| `src/data/gold.ts`        | corpus-level checks that reject or relabel libpostal noise refine can't see                                                                        |
-| `overrides/gold.jsonl`    | hand-checked labels for single lines                                                                                                               |
-| `src/labels.ts`           | the label set                                                                                                                                      |
-
-## Gold labels
-
-libpostal's labels are coarse and its text has deliberate noise (truncated and misspelled
-words), so the gold labels are derived by heuristics, in order:
-
-1. `src/data/refine.ts` splits each libpostal field into output labels, one line at a time.
-2. `src/data/gold.ts` checks the result against counts over the whole corpus: it rejects roads
-   whose type libpostal cut to one letter ("Wilmont D"), relabels misspelled types ("Raod")
-   as `StreetNamePostType`, and notes city names abbreviated beyond USPS forms ("S Diego").
-3. `overrides/gold.jsonl` replaces both for single lines, by hand.
-
-Every rule that makes a judgment call adds a note to the example's `notes`, and
-`data/stats.json` counts each note, each rejection reason, and the overrides. The
-`gold=heuristic` slice is the examples with such a note; `gold=clean` is the rest: labels no rule
-had to guess at, or hand-checked ones. Noise the rules don't recognize can still hide there. `dropped:<field>` notes (a field was removed
-from the text) don't count.
-
-### Overrides
-
-`overrides/gold.jsonl` has one JSON object per line:
-
-```json
-{"key":"4fa35de149bcebea","text":"100 WILMONT D, WAUKESHA, Wisconsin 53189","spans":[["100","AddressNumber"],["WILMONT","StreetName"],["D","StreetNamePostType"],["WAUKESHA","PlaceName"],["Wisconsin","StateName"],["53189","ZipCode"]],"why":"D is Drive truncated"}
-{"key":"851856e2a707501b","text":"1026 31st St, Ug, Apartment 2011","reject":"Ug is libpostal's German basement; no US reading"}
-```
-
-- `key`: the first 16 hex digits of the sha1 of the raw libpostal line.
-- `text`: the refined text the entry was written against, unique in the file. Overrides only change labels, never
-  text. When the line no longer refines to this text (the line is gone, or refine or rendering
-  changed), the entry is stale: it applies to nothing and `stats.overrides.stale` counts it.
-- `spans`: each span's text and label, in order; each is matched at the next whole-word
-  occurrence, and every letter and digit of `text` must be in a span. Or `reject`: why the line
-  is dropped.
-- `why`: optional note on the fix.
-
-An override applies to every line that refines to the same text, and replaces the corpus checks,
-so it can also keep a line they would reject. The example gets the note `override`.
-`pnpm data:override osm:6` (an example id, or a text substring) prints entries with the current
-labels, plus each line's split, notes and rejection on stderr; edit one, append it and rebuild.
-`pnpm test` validates the file.
+| file                                                                                            | controls                                                                                       |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `eval.config.ts`                                                                                | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve |
+| `src/eval/headline.ts`                                                                          | which metrics the tables show, their order, format and noise thresholds (`pnpm noise`)         |
+| `src/eval/slices.ts`                                                                            | accuracy subsets                                                                               |
+| `src/data/refine.ts`                                                                            | how libpostal's labels map to the output labels                                                |
+| `src/labels.ts`                                                                                 | the label set                                                                                  |
+| `pnpm data:override osm:6` (an example id, or a text substring) prints entries with the current |
 
 ## Dev vs test
 
