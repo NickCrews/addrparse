@@ -14,26 +14,25 @@
  * A reference impl (`ReferenceImpl`, e.g. usaddress) is trained elsewhere and runs out of
  * process, so only its accuracy is measured; `--only` and `--retrain` don't apply to it.
  */
-import { spawn, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { SUITES, type Suite, type SuiteName } from "../../eval.config.ts";
 import { hashSplit, loadExamples } from "../data/load.ts";
-import { MODELS_DIR, PREDICTIONS_DIR, ROOT, type Split } from "../data/paths.ts";
+import { MODELS_DIR, PREDICTIONS_DIR, type Split } from "../data/paths.ts";
 import type { Example, ReferenceImpl, ScoredParse, Span } from "../types.ts";
 import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
 import { bundleImpl } from "./bundle.ts";
-import type {
-  LatencyArgs,
-  PredictArgs,
-  ModelArgs,
-  Task,
-  ThroughputArgs,
-  TrainArgs,
-} from "./child.ts";
+import type { LatencyArgs, PredictArgs, ModelArgs, ThroughputArgs, TrainArgs } from "./child.ts";
+import {
+  ensureModel as ensureCachedModel,
+  gitInfo,
+  machineInfo,
+  runChild,
+  sha256,
+  type Training,
+} from "./models.ts";
 import { implCodeSize, implSourceHash, importReference, listImpls } from "./impl.ts";
 import { c, comparabilityNotes, deltaTable, detailTables, sideBySideTable } from "./report.ts";
 import { loadRuns, saveRun, type RunResult } from "./results.ts";
@@ -48,7 +47,6 @@ const STEPS = [
   "curve",
 ] as const;
 type Step = (typeof STEPS)[number];
-type Training = NonNullable<RunResult["metrics"]["training"]>;
 
 const { values: opts, positionals: impls } = parseArgs({
   allowPositionals: true,
@@ -94,61 +92,8 @@ const log = (msg: string) => process.stderr.write(msg + "\n");
 const now = () => performance.now();
 const secs = (t0: number) => `${((now() - t0) / 1000).toFixed(1)}s`;
 
-/** Runs `child.ts <task>` in a fresh process and returns its RESULT. */
-function runChild<T>(task: Task, args: object, nodeFlags: string[] = []): Promise<T> {
-  const child = spawn(
-    process.execPath,
-    [
-      "--expose-gc",
-      ...nodeFlags,
-      join(import.meta.dirname, "child.ts"),
-      task,
-      JSON.stringify(args),
-    ],
-    { stdio: ["ignore", "pipe", "inherit"] },
-  );
-  let stdout = "";
-  child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
-  return new Promise((resolve, reject) => {
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      const line = stdout.split("\n").find((l) => l.startsWith("RESULT "));
-      if (code === 0 && line) resolve(JSON.parse(line.slice("RESULT ".length)) as T);
-      else reject(new Error(`${task} child exited with ${signal ?? code}`));
-    });
-  });
-}
-
-const sha256 = (buf: Uint8Array | string) => createHash("sha256").update(buf).digest("hex");
-
-/** Trains `impl` on the first `n` training examples unless a cached model exists. */
-async function ensureModel(impl: string, implHash: string, n: number) {
-  const trainHash = await hashSplit("train", n);
-  const key = sha256([implHash, trainHash, config.seed, n].join("|")).slice(0, 16);
-  const dir = join(MODELS_DIR, impl);
-  const model = join(dir, `${key}.bin`);
-  const metaPath = join(dir, `${key}.train.json`);
-  if (!opts.retrain && existsSync(model) && existsSync(metaPath)) {
-    const training = JSON.parse(readFileSync(metaPath, "utf8")) as Training;
-    training.measured ??= { at: statSync(metaPath).mtime.toISOString() };
-    return { model, trainHash, training: { ...training, cached: true } };
-  }
-  mkdirSync(dir, { recursive: true });
-  const t0 = now();
-  log(`  train ${n.toLocaleString("en-US")} examples …`);
-  const measured = { at: new Date().toISOString(), git: gitInfo(), machine: machineInfo() };
-  const result = {
-    measured,
-    ...(await runChild<Omit<Training, "cached" | "measured">>(
-      "train",
-      { impl, split: "train", n, seed: config.seed, out: model } satisfies TrainArgs,
-      ["--max-old-space-size=16384"],
-    )),
-  };
-  writeFileSync(metaPath, JSON.stringify(result, null, 2) + "\n");
-  log(`  train done in ${secs(t0)}`);
-  return { model, trainHash, training: { ...result, cached: false } };
-}
+const ensureModel = (impl: string, implHash: string, n: number) =>
+  ensureCachedModel({ impl, implHash, n, seed: config.seed, retrain: opts.retrain, log });
 
 /** Predicts the eval set into `out` and returns the predictions in eval order. */
 async function predict(impl: string, model: string, out: string, examples: readonly Example[]) {
@@ -173,17 +118,6 @@ async function predict(impl: string, model: string, out: string, examples: reado
   };
 }
 
-function gitInfo(): RunResult["git"] {
-  const git = (...args: string[]) => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8" });
-  const head = git("rev-parse", "HEAD");
-  // Saved runs are results, not code; they don't make the tree dirty.
-  const status = git("status", "--porcelain", "--", ".", ":!results");
-  return {
-    sha: head.status === 0 ? head.stdout.trim() : null,
-    dirty: status.status === 0 ? status.stdout.trim() !== "" : true,
-  };
-}
-
 /** "measured 2026-11-06 18:52 at abc1234 on <cpu>", noting a machine other than this one. */
 function trainingProvenance(t: Training): string {
   const m = t.measured;
@@ -192,17 +126,6 @@ function trainingProvenance(t: Training): string {
   if (m.git?.sha) s += ` at ${m.git.sha.slice(0, 7)}${m.git.dirty ? "+dirty" : ""}`;
   if (m.machine && m.machine.cpu !== machineInfo().cpu) s += c.yellow(` on ${m.machine.cpu}`);
   return s + "; --retrain re-measures";
-}
-
-function machineInfo(): RunResult["machine"] {
-  return {
-    cpu: os.cpus()[0]?.model ?? "unknown",
-    cores: os.availableParallelism(),
-    memoryGB: Math.round(os.totalmem() / 1024 ** 3),
-    os: `${os.platform()} ${os.release()}`,
-    node: process.version,
-    load: os.loadavg()[0],
-  };
 }
 
 function newRunId(impl: string, started: Date): string {
