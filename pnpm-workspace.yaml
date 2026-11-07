@@ -1,0 +1,6 @@
+# esbuild installs its platform binary in a build script. pnpm 11+ reads allowBuilds;
+# pnpm 10 (pinned in CI) reads onlyBuiltDependencies.
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

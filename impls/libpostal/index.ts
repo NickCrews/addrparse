@@ -1,7 +1,7 @@
 /**
  * Reference: libpostal (https://github.com/openvenues/libpostal), a CRF trained on OSM and
  * OpenAddresses, run in Python via `uv` and the `postal` bindings (pinned in predict.py and
- * predict.py.lock). Needs the libpostal C library and its ~2 GB data directory; see README.md.
+ * predict.py.lock). Needs the libpostal C library and its ~2 GB data directory; see CONTRIBUTING.md.
  *
  * libpostal was trained on the same tagged lines our gold labels come from (src/data), so its
  * score is an optimistic upper reference, not a held-out one.

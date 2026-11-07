@@ -4,7 +4,7 @@
 # ///
 """Reads one JSON string per stdin line; writes libpostal's parse_address [[value, label], ...]
 or {"error": message} per stdout line. Needs the libpostal C library and its data directory
-(LIBPOSTAL_DATA_DIR); see README.md."""
+(LIBPOSTAL_DATA_DIR); see CONTRIBUTING.md."""
 
 import json
 import sys

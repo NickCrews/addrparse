@@ -12,7 +12,7 @@ uncommitted for review unless told otherwise.
 
 ## Context
 
-The repo is an eval harness built for hill-climbing parsers. Read `README.md` first, then:
+The repo is an eval harness built for hill-climbing parsers. Read `CONTRIBUTING.md` first, then:
 
 - `src/types.ts`: the `Impl` contract. `train(examples, ctx)` returns `{ model: Uint8Array, info? }`
   and `load(bytes)` returns a parser whose `parse(text)` returns `Span[]` or
