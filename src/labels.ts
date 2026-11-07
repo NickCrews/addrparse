@@ -4,6 +4,8 @@
  * from libpostal's coarser labels.
  */
 export const LABELS = {
+  Recipient:
+    "Person or business the mail is for, with any C/O or Attn before it: C/O Jane Doe, Attn Billing",
   AddressNumberPrefix: "Word before a milepost number: Mile, MP, Milepost (Mile 14.5 Parks Hwy)",
   AddressNumber: "House number: 123, 123A, 45-29",
   AddressNumberSuffix:
@@ -16,6 +18,8 @@ export const LABELS = {
   StreetNamePostDirectional: "Directional after the street type: Main St NE",
   OccupancyType: "Unit designator: Apt, Suite, #, Floor, / F; or a numberless level: Basement, Gf",
   OccupancyIdentifier: "Unit number: 4B, 2009",
+  LandmarkName:
+    "Named building, complex or subdivision that is not the street, or a description of where the place is: Teacher Housing, Copper Basin Hall, Blue house across from the post office",
   USPSBoxGroupType: "Route a box is on: RR, Rural Route, HC, Star Route, PSC, CMR, Unit",
   USPSBoxGroupID: "Route number: the 2 of RR 2 Box 5",
   USPSBoxType: "Box designator: PO Box, Box, Drawer; or General Delivery, which has no ID",

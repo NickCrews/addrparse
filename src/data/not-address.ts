@@ -4,7 +4,9 @@
  * - junk: a whole text that is not an address: placeholders ("N/A", "same as above"), emails,
  *   phone numbers, person names and runs of ordinary words. Every token is NotAddress.
  * - embedded: a real address example wrapped in surrounding text ("Mail to 12 Main St, thanks").
- *   The address keeps its spans, shifted; the surrounding text is NotAddress.
+ *   The address keeps its spans, shifted; the surrounding text is NotAddress, except a person
+ *   name written before the address ("Sandra Baker, 12 Main St", "C/O Sandra Baker, ..."), which
+ *   is Recipient. A name alone, with no address, is junk.
  *
  * NotAddress spans are built with `spansFromTokens`, so they break at `,`/`;` exactly where a
  * token-level model's would. Every choice comes from a PRNG seeded by the seed and the id of the
@@ -13,6 +15,7 @@
  * example.com/org/net, and phone numbers use the fictional 555-01xx range.
  */
 import { spansFromTokens, tokenize } from "../tokens.ts";
+import type { Label } from "../labels.ts";
 import type { Example, Span } from "../types.ts";
 import { pick, type Rng } from "./datasets.ts";
 import { seededRng } from "./noise.ts";
@@ -148,6 +151,11 @@ export function junkText(rng: Rng): string {
 
 /** NotAddress spans over `text[from, to)`, offset into the whole text. */
 function notAddressSpans(text: string, from: number, to: number): Span[] {
+  return labelSpans(text, from, to, "NotAddress");
+}
+
+/** Spans of one label over `text[from, to)`, broken at `,`/`;` as `spansFromTokens` does. */
+function labelSpans(text: string, from: number, to: number, label: Label): Span[] {
   const tokens = tokenize(text.slice(from, to)).map((t) => ({
     start: t.start + from,
     end: t.end + from,
@@ -156,11 +164,14 @@ function notAddressSpans(text: string, from: number, to: number): Span[] {
   }));
   return spansFromTokens(
     tokens,
-    tokens.map(() => "NotAddress"),
+    tokens.map(() => label),
   );
 }
 
-const PREFIXES: readonly ((rng: Rng) => string)[] = [
+/** Text before an embedded address, and the label of its words. */
+type Prefix = { text: string; label: Label };
+
+const PREFIXES: readonly ((rng: Rng) => string | Prefix)[] = [
   () => "Mail to ",
   () => "Ship to: ",
   () => "Address: ",
@@ -173,8 +184,12 @@ const PREFIXES: readonly ((rng: Rng) => string)[] = [
   () => "Home: ",
   () => "Lives at ",
   () => "New address ",
-  (rng) => `${personName(rng)}, `,
-  (rng) => `${personName(rng)} `,
+  (rng) => ({ text: `${personName(rng)}, `, label: "Recipient" }),
+  (rng) => ({ text: `${personName(rng)} `, label: "Recipient" }),
+  (rng) => ({
+    text: `${pick(rng, ["C/O", "c/o", "Attn:", "ATTN"])} ${personName(rng)}, `,
+    label: "Recipient",
+  }),
 ];
 
 /**
@@ -197,7 +212,9 @@ const SUFFIXES: readonly ((rng: Rng) => string)[] = [
 /** `ex` wrapped in a prefix, a suffix or both. */
 export function embed(ex: Example, rng: Rng): Example {
   const r = rng();
-  let prefix = r < 0.75 ? pick(rng, PREFIXES)(rng) : "";
+  const picked = r < 0.75 ? pick(rng, PREFIXES)(rng) : "";
+  let { text: prefix, label: prefixLabel } =
+    typeof picked === "string" ? { text: picked, label: "NotAddress" as Label } : picked;
   let suffix = r >= 0.45 ? pick(rng, SUFFIXES)(rng) : "";
   if (/\p{L}/u.test(ex.text) && ex.text === ex.text.toUpperCase()) {
     prefix = prefix.toUpperCase();
@@ -206,7 +223,7 @@ export function embed(ex: Example, rng: Rng): Example {
   const text = prefix + ex.text + suffix;
   const end = prefix.length + ex.text.length;
   const spans = [
-    ...notAddressSpans(text, 0, prefix.length),
+    ...labelSpans(text, 0, prefix.length, prefixLabel),
     ...ex.spans.map((s) => ({ ...s, start: s.start + prefix.length, end: s.end + prefix.length })),
     ...notAddressSpans(text, end, text.length),
   ];

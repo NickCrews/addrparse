@@ -61,6 +61,44 @@ Forms of address that people put on forms and that libpostal's data barely has:
 | `milepost`         | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy |
 | `military`         | PSC 1234, Box 5678, APO AE 09204        |
 
+And one hand-labeled dataset, `ak-voterfile` (below).
+
+## `ak-voterfile.jsonl`: Alaska voter-file addresses
+
+Real residence and mailing addresses from the State of Alaska's public voter file (the
+2026-04-08 extract), chosen for the forms the other datasets lack: village streets with no house
+numbers, lot and block numbers, `HOUSE #6` and `HUD #2`, mileposts written every way
+(`MI 274 .5 RICHARDSON HWY`), named housing and subdivisions, directions in place of an address,
+PO box letter codes (`PO BOX PPV`), private mailboxes, C/O lines, a street and a PO box together,
+and data-entry repeats. Foreign addresses and lines a plain street or PO box pattern explains are
+left out. There is one example per shape: lines that differ only in their digits
+(`3705 ARCTIC BLVD PMB 2550` and `PMB 1071`) count as one, and the first is kept. Text is the
+file's address lines joined with `, `, then the city, state and ZIP (left off a random 15% of
+one-line addresses, and when the line already ends with them).
+
+Of its 23,919 examples, 78% were labeled by rules written for these shapes and the rest by an
+LLM following the conventions below. The rules send any line they can't fully explain to the LLM, but
+neither half has been checked line by line by a person, so expect some wrong labels.
+
+Labeling conventions beyond `src/labels.ts`:
+
+- A street with no house number keeps its street labels; a number or `#n` after it is the unit:
+  `BLUEBERRY ST #3` → StreetName, StreetNamePostType, OccupancyIdentifier.
+- Lot, block, tract, house, HUD, PMB, slip, stall and cabin numbers are OccupancyType and
+  OccupancyIdentifier, like Apt and Suite: `LOT 4 BLOCK 8`, `HOUSE #17`, `STE 2 PMB 507`.
+- LandmarkName is a named building, housing area, subdivision, survey, island, lake, bay or
+  harbor that isn't serving as the street (`TEACHER HOUSING APT C4`, `NAUKATI BAY SUBD LOT 14`,
+  `ANDERSON ST HOUSING #5` → only `HOUSING`), or a description of where the place is, numbers
+  included (`5TH HOUSE SOUTH OF SCHOOL`).
+- Recipient is a C/O, ATTN or IN CARE OF line with its name, or a name line written with the
+  address.
+- A repeat of what the line already said (`101 CHURCH ST 101 CHURCH`), `SAME` and `NHN` (no
+  house number) are NotAddress.
+- An intersection is two streets with the `AND` or `&` between them unlabeled:
+  `3RD AND ALDER ST`.
+- A token that glues two fields can't be split, so it gets the label of its main part: `APT.9`
+  and `SP#142` are OccupancyIdentifier, `PO#39737` is USPSBoxID.
+
 ## Training on another blend
 
 ```sh

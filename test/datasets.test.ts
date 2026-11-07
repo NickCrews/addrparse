@@ -29,7 +29,14 @@ describe("listDatasets", () => {
       "junk",
       "embedded",
     ]);
-    for (const name of ["po-box", "rural-route", "general-delivery", "milepost", "military"]) {
+    for (const name of [
+      "po-box",
+      "rural-route",
+      "general-delivery",
+      "milepost",
+      "military",
+      "ak-voterfile",
+    ]) {
       assert.ok(all.includes(name), name);
     }
     assert.ok(!all.includes("_forms"), "files starting with _ are helpers");
@@ -62,7 +69,7 @@ describe("resolveBlend", () => {
   it("keeps only `use` and drops `without`, by name or tag", () => {
     const w = resolveBlend({ use: ["libpostal", "po-box"], without: ["ways"] }, all, registry);
     assert.deepEqual(Object.keys(w), ["openaddresses", "osm", "places", "po-box"]);
-    const none = resolveBlend({ without: ["synthetic", "not-address"] }, all, registry);
+    const none = resolveBlend({ without: ["synthetic", "not-address", "labeled"] }, all, registry);
     assert.deepEqual(Object.keys(none), ["openaddresses", "osm", "ways", "places"]);
   });
 
@@ -75,7 +82,15 @@ describe("resolveBlend", () => {
   it("rejects unknown names and blends that leave nothing", () => {
     assert.throws(() => resolveBlend({ without: ["nope"] }, all, registry), /not a dataset or tag/);
     assert.throws(() => resolveBlend({ weights: { nope: 1 } }, all, registry), /not a dataset/);
-    assert.throws(() => resolveBlend({ use: ["labeled"] }, all, registry), /every dataset/);
+    assert.throws(
+      () =>
+        resolveBlend(
+          { without: ["libpostal", "not-address", "synthetic", "labeled"] },
+          all,
+          registry,
+        ),
+      /every dataset/,
+    );
   });
 });
 

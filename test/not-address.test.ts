@@ -81,7 +81,7 @@ describe("notAddressExamples", () => {
   it("keeps the embedded address's spans on the same text", () => {
     for (const ex of all.filter((e) => e.source === "embedded")) {
       assertWellFormed(ex);
-      const address = ex.spans.filter((s) => s.label !== "NotAddress");
+      const address = ex.spans.filter((s) => s.label !== "NotAddress" && s.label !== "Recipient");
       assert.deepEqual(pairs(ex.text, address), pairs(kenai.text, kenai.spans));
       assert.ok(ex.text.includes(kenai.text), ex.text);
     }
@@ -108,6 +108,22 @@ describe("embed", () => {
       const ex = embed(caps, rngFor(String(i)));
       assert.equal(ex.text, ex.text.toUpperCase());
     }
+  });
+
+  it("labels a name before the address Recipient and other surrounding text NotAddress", () => {
+    const out = Array.from({ length: 300 }, (_, i) => embed(kenai, rngFor(`r${i}`)));
+    const recipients = out.filter((ex) => ex.spans.some((s) => s.label === "Recipient"));
+    assert.ok(recipients.length > 0);
+    for (const ex of recipients) {
+      assertWellFormed(ex);
+      const first = ex.spans.findIndex((s) => s.label !== "Recipient");
+      assert.ok(
+        ex.spans.slice(first).every((s) => s.label !== "Recipient"),
+        ex.text,
+      );
+      assert.ok(ex.text.indexOf(kenai.text) >= ex.spans[first - 1]!.end, ex.text);
+    }
+    assert.ok(out.some((ex) => /^(C\/O|c\/o|Attn:|ATTN) /.test(ex.text)));
   });
 });
 
