@@ -125,6 +125,12 @@ const unitFirst: Transform = (pieces, rng) => {
 /** Unit types commonly written flush against their identifier. */
 const JOINABLE_UNIT_TYPE = /(?:^|\s)(?:#|apt|ap|unit|ste|no|rm)$/i;
 
+/**
+ * A `#` joined to its identifier becomes part of the identifier, following usaddress: "#4" is
+ * OccupancyIdentifier, and "Floor # 1" becomes OccupancyType "Floor" + OccupancyIdentifier "#1",
+ * so span boundaries stay on whitespace. A joined letter type ("Apt4", "Unit139") keeps its
+ * type and identifier as two spans inside one whitespace token.
+ */
 const unitJoined: Transform = (pieces) => {
   let changed = false;
   for (let i = 1; i + 2 < pieces.length; i += 2) {
@@ -134,7 +140,13 @@ const unitJoined: Transform = (pieces) => {
     if (!/^\s+$/.test(pieces[i + 1]!.text) || !JOINABLE_UNIT_TYPE.test(type.text)) continue;
     // "AptB" reads as one word; only join a letter type to a numeric identifier.
     if (/\p{L}$/u.test(type.text) && !/^\p{N}/u.test(id.text)) continue;
-    pieces[i + 1] = { text: "" };
+    const hash = /^(.*?)(\s*)#$/su.exec(type.text);
+    if (hash) {
+      // An empty type piece ("#" alone) produces no span; see fromPieces.
+      pieces[i] = { ...type, text: hash[1]! };
+      pieces[i + 1] = { text: hash[2]! };
+      pieces[i + 2] = { ...id, text: `#${id.text}` };
+    } else pieces[i + 1] = { text: "" };
     changed = true;
   }
   return changed ? pieces : undefined;
