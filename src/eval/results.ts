@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Suite } from "../../eval.config.ts";
 import { RUNS_DIR } from "../data/paths.ts";
 import type { AccuracyMetrics } from "./accuracy.ts";
+import type { BundleMetrics } from "./bundle.ts";
 
 /** Everything one `pnpm eval` run of one implementation measured. Saved to results/runs/. */
 export interface RunResult {
@@ -20,11 +21,29 @@ export interface RunResult {
   implHash: string;
   /** `trainHash` is null for a reference impl, which is trained elsewhere. */
   data: { trainHash: string | null; evalHash: string };
-  machine: { cpu: string; cores: number; memoryGB: number; os: string; node: string };
+  machine: {
+    cpu: string;
+    cores: number;
+    memoryGB: number;
+    os: string;
+    node: string;
+    /**
+     * 1-minute load average, the higher of its values at the start and end of the run (for
+     * `training.measured`, at the start of training). Above `cores`, other processes competed
+     * for the CPU, so timings are unreliable.
+     */
+    load?: number;
+  };
   metrics: {
     accuracy?: AccuracyMetrics & { parseErrors: number; firstParseError?: string };
     training?: {
+      /** True when the model came from the cache and these metrics from the run that trained it. */
       cached: boolean;
+      /**
+       * When, at which commit and on which machine training was measured. A cache entry
+       * without this record gets only `at`, from its file's modification time.
+       */
+      measured?: { at: string; git?: RunResult["git"]; machine?: RunResult["machine"] };
       seconds: number;
       examplesPerSec: number;
       tokensPerSec: number;
@@ -33,6 +52,10 @@ export interface RunResult {
       /** Peak RSS sampled during `train()`, minus RSS just before it. */
       peakRssOverBaselineMB: number;
       baselineRssMB: number;
+      /** Peak V8 heap + external memory during `train()`, minus before (heap.ts). */
+      peakHeapOverBaselineMB?: number;
+      /** V8 heap + external bytes allocated during `train()`, including garbage. */
+      allocatedMB?: number;
       modelBytes: number;
       info: Record<string, number | string>;
     };
@@ -48,7 +71,10 @@ export interface RunResult {
       /** Peak RSS sampled during `load()` plus one parse of every eval text, minus RSS before. */
       peakRssOverBaselineMB: number;
       baselineRssMB: number;
+      /** Peak V8 heap + external memory over the same window, minus before (heap.ts). */
+      peakHeapOverBaselineMB?: number;
     };
+    bundle?: BundleMetrics | { error: string };
     latency?: {
       calls: number;
       meanUs: number;

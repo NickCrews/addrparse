@@ -68,27 +68,40 @@ export function deltaTable(base: RunResult | undefined, run: RunResult, labels?:
     if (a === undefined && b === undefined) continue;
     rows.push([m.name, fmt(m, a), fmt(m, b), formatDelta(m, a, b)]);
   }
-  return renderTable(["metric", la, lb, "Δ"], rows);
+  const table = renderTable(["metric", la, lb, "Δ"], rows);
+  return run.impl === FLOOR_IMPL
+    ? `${table}\n${c.dim(`${FLOOR_IMPL}: timings and memory are the harness's floor, not a parser's`)}`
+    : table;
 }
+
+/**
+ * The impl that does nothing. Its timings and memory are the harness's own floor (loop and
+ * call overhead), not a parser's, so side-by-side tables dim its column and never pick it as
+ * best.
+ */
+export const FLOOR_IMPL = "noop";
 
 /** Headline metrics of several runs side by side; the best value of each row is highlighted. */
 export function sideBySideTable(runs: readonly RunResult[], labels: readonly string[]) {
+  const isFloor = runs.map((r) => r.impl === FLOOR_IMPL);
   const rows: string[][] = [];
   for (const m of HEADLINE) {
     const values = runs.map((r) => m.get(r));
-    const present = values.filter((v): v is number => v !== undefined);
-    if (present.length === 0) continue;
-    const best = m.better === "higher" ? Math.max(...present) : Math.min(...present);
-    const distinct = new Set(present).size > 1;
+    if (values.every((v) => v === undefined)) continue;
+    const ranked = values.filter((v, i): v is number => v !== undefined && !isFloor[i]);
+    const best = m.better === "higher" ? Math.max(...ranked) : Math.min(...ranked);
+    const distinct = new Set(ranked).size > 1;
     rows.push([
       m.name,
-      ...values.map((v) => {
+      ...values.map((v, i) => {
         const s = fmt(m, v);
+        if (isFloor[i]) return c.dim(s);
         return distinct && v === best ? c.boldGreen(s) : s;
       }),
     ]);
   }
-  return renderTable(["metric", ...labels], rows);
+  const header = labels.map((l, i) => (isFloor[i] ? `${l} (floor)` : l));
+  return renderTable(["metric", ...header], rows);
 }
 
 const pct = (v: number | undefined) => (v === undefined ? c.dim("–") : `${(v * 100).toFixed(2)}%`);
@@ -168,6 +181,21 @@ export function comparabilityNotes(runs: readonly RunResult[]): string[] {
   }
   if (differ((r) => r.suite)) notes.push("suites differ");
   if (differ((r) => r.machine.cpu)) notes.push("machines differ: timings not comparable");
+  const trainedOn = (r: RunResult) => r.metrics.training?.measured?.machine?.cpu ?? r.machine.cpu;
+  if (!differ((r) => r.machine.cpu) && differ(trainedOn)) {
+    notes.push("cached training metrics come from different machines: not comparable");
+  }
+  for (const r of runs) {
+    const busy = (m: RunResult["machine"] | undefined) => m?.load !== undefined && m.load > m.cores;
+    const m = r.machine;
+    if (busy(m)) {
+      notes.push(
+        `machine busy during ${shortId(r)} (load ${m.load!.toFixed(0)} on ${m.cores} cores): timings unreliable`,
+      );
+    } else if (busy(r.metrics.training?.measured?.machine)) {
+      notes.push(`machine busy while training for ${shortId(r)}: training timings unreliable`);
+    }
+  }
   return notes.map((n) => c.yellow(`note: ${n}`));
 }
 

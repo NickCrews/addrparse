@@ -10,6 +10,7 @@
     "eval": "node src/eval/run.ts",
     "compare": "node src/eval/compare.ts",
     "errors": "node src/eval/errors.ts",
+    "noise": "node src/eval/noise.ts",
     "test": "node --test 'test/**/*.test.ts'",
     "typecheck": "tsc",
     "fmt": "oxfmt",
@@ -17,10 +18,16 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "esbuild": "0.28.2",
     "oxfmt": "^0.77.0",
     "typescript": "^5.9.0"
   },
   "engines": {
     "node": ">=24"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

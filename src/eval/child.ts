@@ -10,6 +10,7 @@ import { gzipSync } from "node:zlib";
 import { loadExamples } from "../data/load.ts";
 import type { Split } from "../data/paths.ts";
 import { asScoredParse, type Span } from "../types.ts";
+import { startHeapWindow } from "./heap.ts";
 import { importImpl } from "./impl.ts";
 import { startRssSampler } from "./rss-sampler.ts";
 import { MB, mean, median, percentile } from "./stats.ts";
@@ -45,12 +46,14 @@ async function train(a: TrainArgs) {
   const sampler = await startRssSampler();
   const rssBefore = settle();
   sampler.reset();
+  const endHeap = startHeapWindow();
   const t0 = now();
   const result = await impl.train(examples, {
     seed: a.seed,
     log: (m) => process.stderr.write(`[${a.impl} train] ${m}\n`),
   });
   const seconds = (now() - t0) / 1000;
+  const heap = endHeap();
   const windowPeak = sampler.peak();
   await sampler.stop();
   writeFileSync(a.out, result.model);
@@ -61,6 +64,8 @@ async function train(a: TrainArgs) {
     peakRssMB: peakRss() / MB,
     peakRssOverBaselineMB: (windowPeak - rssBefore) / MB,
     baselineRssMB: rssBefore / MB,
+    peakHeapOverBaselineMB: heap.peakOverBaseline / MB,
+    allocatedMB: heap.allocated / MB,
     modelBytes: result.model.byteLength,
     info: result.info ?? {},
   };
@@ -103,6 +108,7 @@ async function memory(a: ModelArgs) {
   const rss0 = settle();
   const heap0 = process.memoryUsage().heapUsed;
   sampler.reset();
+  const endHeap = startHeapWindow();
 
   const t0 = now();
   const parser = impl.load(bytes);
@@ -114,6 +120,7 @@ async function memory(a: ModelArgs) {
   const rssLoaded = settle();
   const heapLoaded = process.memoryUsage().heapUsed;
   for (const t of texts) parser.parse(t);
+  const heap = endHeap();
   const windowPeak = sampler.peak();
   await sampler.stop();
   return {
@@ -126,6 +133,7 @@ async function memory(a: ModelArgs) {
     peakRssMB: peakRss() / MB,
     peakRssOverBaselineMB: (windowPeak - rss0) / MB,
     baselineRssMB: rss0 / MB,
+    peakHeapOverBaselineMB: heap.peakOverBaseline / MB,
   };
 }
 
