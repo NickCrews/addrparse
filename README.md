@@ -110,3 +110,16 @@ suites, data or machines aren't comparable; `compare` prints a note when they di
 Hill-climb on `dev` (the default). Score on `test` with `--split test` only occasionally, e.g.
 before writing up a result, so it stays an unbiased estimate. Test runs get a `-test` suffix in
 their id and are only compared with other test runs.
+
+## CI
+
+`.github/workflows/ci.yml` runs `pnpm check` and then the `ci` suite for every impl on
+`test/fixtures/data/`, a few hundred committed examples. Any command reads its data from
+`$ADDRPARSE_DATA_DIR` instead of `data/` when that is set:
+
+```sh
+ADDRPARSE_DATA_DIR=test/fixtures/data pnpm eval lookup --suite ci
+```
+
+`node src/data/fixture.ts` regenerates the fixture from the first examples of each split in
+`data/`; rerun it after changing how the data is built.

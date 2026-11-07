@@ -1,7 +1,10 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export const ROOT = join(import.meta.dirname, "..", "..");
-export const DATA_DIR = join(ROOT, "data");
+/** data/, or the directory in `ADDRPARSE_DATA_DIR` (CI points it at test/fixtures/data). */
+export const DATA_DIR = process.env.ADDRPARSE_DATA_DIR
+  ? resolve(process.env.ADDRPARSE_DATA_DIR)
+  : join(ROOT, "data");
 export const RAW_DIR = join(DATA_DIR, "raw");
 export const MODELS_DIR = join(ROOT, "models");
 export const RESULTS_DIR = join(ROOT, "results");
