@@ -140,7 +140,8 @@ export function lockedVersions(lockPath: string): Record<string, string> {
 
 /**
  * Collects a subprocess's per-text outputs: an array is a parse, anything else
- * (`{"error": ...}`) a failure that gets empty spans.
+ * (`{"error": ...}`) a failure that gets empty spans. `firstError` names the failed text by its
+ * index in `texts`.
  */
 export function collectPredictions<T>(
   texts: readonly string[],
@@ -154,7 +155,8 @@ export function collectPredictions<T>(
   outputs.forEach((r, i) => {
     if (!Array.isArray(r)) {
       parseErrors++;
-      firstError ??= `${JSON.stringify(texts[i])}: ${JSON.stringify(r)}`;
+      // The index, not the text, so committed run files hold no example text.
+      firstError ??= `text ${i}: ${JSON.stringify(r)}`;
       spans.push([]);
       return;
     }
