@@ -1,0 +1,720 @@
+{
+  "runId": "2026-11-07T10-42-26__crf__full",
+  "timestamp": "2026-11-07T19:42:26.840Z",
+  "impl": "crf",
+  "suite": "full",
+  "config": {
+    "split": "dev",
+    "trainExamples": 500000,
+    "evalExamples": 20000,
+    "seed": 1,
+    "latency": {
+      "warmupPasses": 3,
+      "calls": 300000
+    },
+    "throughput": {
+      "seconds": 3,
+      "repeats": 5,
+      "threads": [
+        1,
+        4
+      ]
+    },
+    "determinism": true,
+    "learningCurve": [
+      5000,
+      50000
+    ]
+  },
+  "git": {
+    "sha": "8e5bb9c9056a860d3d4a01abc2758d9d6e6fd027",
+    "dirty": true
+  },
+  "implHash": "3a42f071b0e467c3",
+  "data": {
+    "trainHash": "c8f90fac612fc580",
+    "evalHash": "c460cf971b3cabcd",
+    "trainWeights": {
+      "openaddresses": 1,
+      "osm": 0.76,
+      "ways": 0.17,
+      "places": 0.09,
+      "junk": 0.027,
+      "embedded": 0.039,
+      "general-delivery": 0.012,
+      "highway-contract": 0.015,
+      "milepost": 0.02,
+      "military": 0.012,
+      "po-box": 0.04,
+      "rural-route": 0.02
+    }
+  },
+  "machine": {
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "memoryGB": 64,
+    "os": "darwin 25.6.0",
+    "node": "v26.12.1",
+    "load": 3.6240234375
+  },
+  "metrics": {
+    "training": {
+      "measured": {
+        "at": "2026-11-07T19:42:27.278Z",
+        "git": {
+          "sha": "8e5bb9c9056a860d3d4a01abc2758d9d6e6fd027",
+          "dirty": true
+        },
+        "machine": {
+          "cpu": "Apple M1 Max",
+          "cores": 10,
+          "memoryGB": 64,
+          "os": "darwin 25.6.0",
+          "node": "v26.12.1",
+          "load": 3.6240234375
+        }
+      },
+      "seconds": 237.80072604179384,
+      "examplesPerSec": 2102.600813389124,
+      "tokensPerSec": 12414.9032222935,
+      "peakRssMB": 1167.078125,
+      "peakRssOverBaselineMB": 444.68809509277344,
+      "baselineRssMB": 731.8555908203125,
+      "peakHeapOverBaselineMB": 447.95681381225586,
+      "allocatedMB": 1748.5145816802979,
+      "modelBytes": 503920,
+      "info": {
+        "trainer": "crf",
+        "trainedFeatures": 779080,
+        "features": 40798,
+        "weights": 99202
+      },
+      "cached": false
+    },
+    "code": {
+      "bytes": 47487,
+      "lines": 1393,
+      "files": 10
+    },
+    "accuracy": {
+      "examples": 20000,
+      "exactMatch": 0.98455,
+      "tokenAccuracy": 0.9987447055608689,
+      "spanF1": 0.9951578461939469,
+      "tokens": 117104,
+      "span": {
+        "precision": 0.9959965885717152,
+        "recall": 0.994320515260485,
+        "f1": 0.9951578461939469
+      },
+      "coarse": {
+        "exactMatch": 0.9958,
+        "tokenAccuracy": 0.9990094275174204,
+        "spanF1": 0.9982378279597964
+      },
+      "perLabel": {
+        "AddressNumberPrefix": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "gold": 181,
+          "predicted": 181
+        },
+        "AddressNumber": {
+          "precision": 0.9995175685454691,
+          "recall": 0.9998391377784928,
+          "f1": 0.9996783273019703,
+          "gold": 12433,
+          "predicted": 12437
+        },
+        "AddressNumberSuffix": {
+          "precision": 0.9393939393939394,
+          "recall": 0.96875,
+          "f1": 0.9538461538461539,
+          "gold": 32,
+          "predicted": 33
+        },
+        "StreetNamePreModifier": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "gold": 5,
+          "predicted": 5
+        },
+        "StreetNamePreDirectional": {
+          "precision": 0.9988378849506101,
+          "recall": 0.999128160418483,
+          "f1": 0.9989830015981404,
+          "gold": 3441,
+          "predicted": 3442
+        },
+        "StreetNamePreType": {
+          "precision": 0.9946808510638298,
+          "recall": 0.9868073878627969,
+          "f1": 0.990728476821192,
+          "gold": 379,
+          "predicted": 376
+        },
+        "StreetName": {
+          "precision": 0.997030487000132,
+          "recall": 0.9971620908130939,
+          "f1": 0.9970962845641126,
+          "gold": 15152,
+          "predicted": 15154
+        },
+        "StreetNamePostType": {
+          "precision": 0.9986450830778008,
+          "recall": 0.9992151266500179,
+          "f1": 0.9989300235394821,
+          "gold": 14015,
+          "predicted": 14023
+        },
+        "StreetNamePostDirectional": {
+          "precision": 0.9760416666666667,
+          "recall": 0.9915343915343915,
+          "f1": 0.9837270341207348,
+          "gold": 945,
+          "predicted": 960
+        },
+        "OccupancyType": {
+          "precision": 0.9151467089611419,
+          "recall": 0.9155097183657279,
+          "f1": 0.9153281776720207,
+          "gold": 2521,
+          "predicted": 2522
+        },
+        "OccupancyIdentifier": {
+          "precision": 0.9943502824858758,
+          "recall": 0.9137380191693291,
+          "f1": 0.9523413111342353,
+          "gold": 2504,
+          "predicted": 2301
+        },
+        "USPSBoxGroupType": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "gold": 425,
+          "predicted": 425
+        },
+        "USPSBoxGroupID": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "gold": 415,
+          "predicted": 415
+        },
+        "USPSBoxType": {
+          "precision": 1,
+          "recall": 0.9990859232175503,
+          "f1": 0.9995427526291724,
+          "gold": 1094,
+          "predicted": 1093
+        },
+        "USPSBoxID": {
+          "precision": 1,
+          "recall": 0.9989858012170385,
+          "f1": 0.9994926433282597,
+          "gold": 986,
+          "predicted": 985
+        },
+        "PlaceName": {
+          "precision": 0.9963935805734206,
+          "recall": 0.9969328842915565,
+          "f1": 0.9966631594769277,
+          "gold": 16628,
+          "predicted": 16637
+        },
+        "StateName": {
+          "precision": 0.9998127574584945,
+          "recall": 0.9996879680479281,
+          "f1": 0.99975035885914,
+          "gold": 16024,
+          "predicted": 16022
+        },
+        "ZipCode": {
+          "precision": 0.9997923803591819,
+          "recall": 0.9998961794019934,
+          "f1": 0.9998442771866078,
+          "gold": 9632,
+          "predicted": 9633
+        },
+        "CountryName": {
+          "precision": 0.9993145990404386,
+          "recall": 0.9993145990404386,
+          "f1": 0.9993145990404386,
+          "gold": 1459,
+          "predicted": 1459
+        },
+        "NotAddress": {
+          "precision": 0.9967989756722151,
+          "recall": 0.9967989756722151,
+          "f1": 0.9967989756722151,
+          "gold": 1562,
+          "predicted": 1562
+        }
+      },
+      "confusions": [
+        {
+          "gold": "PlaceName",
+          "predicted": "StreetNamePostDirectional",
+          "count": 20
+        },
+        {
+          "gold": "PlaceName",
+          "predicted": "StreetName",
+          "count": 17
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "PlaceName",
+          "count": 14
+        },
+        {
+          "gold": "PlaceName",
+          "predicted": "StreetNamePostType",
+          "count": 10
+        },
+        {
+          "gold": "StateName",
+          "predicted": "PlaceName",
+          "count": 7
+        },
+        {
+          "gold": "StreetNamePreType",
+          "predicted": "StreetName",
+          "count": 7
+        },
+        {
+          "gold": "StreetNamePostType",
+          "predicted": "StreetName",
+          "count": 6
+        },
+        {
+          "gold": "StreetNamePostDirectional",
+          "predicted": "PlaceName",
+          "count": 6
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "StreetNamePostType",
+          "count": 6
+        },
+        {
+          "gold": "PlaceName",
+          "predicted": "StateName",
+          "count": 6
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "AddressNumber",
+          "count": 5
+        },
+        {
+          "gold": "StreetNamePostType",
+          "predicted": "PlaceName",
+          "count": 4
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "StreetNamePreDirectional",
+          "count": 3
+        },
+        {
+          "gold": "NotAddress",
+          "predicted": "PlaceName",
+          "count": 3
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "StreetNamePostDirectional",
+          "count": 3
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "NotAddress",
+          "count": 3
+        },
+        {
+          "gold": "AddressNumber",
+          "predicted": "StreetName",
+          "count": 2
+        },
+        {
+          "gold": "StreetNamePreType",
+          "predicted": "StreetNamePostType",
+          "count": 2
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "StreetNamePreType",
+          "count": 2
+        },
+        {
+          "gold": "CountryName",
+          "predicted": "NotAddress",
+          "count": 2
+        }
+      ],
+      "slices": {
+        "source=openaddresses": {
+          "examples": 9073,
+          "exactMatch": 0.9958117491458173,
+          "tokenAccuracy": 0.9991036476054586,
+          "spanF1": 0.9987227812217688
+        },
+        "source=osm": {
+          "examples": 6896,
+          "exactMatch": 0.9666473317865429,
+          "tokenAccuracy": 0.9990861650193589,
+          "spanF1": 0.9899053178614651
+        },
+        "source=ways": {
+          "examples": 1542,
+          "exactMatch": 0.9863813229571985,
+          "tokenAccuracy": 0.9961981849399068,
+          "spanF1": 0.9946897284175391
+        },
+        "source=places": {
+          "examples": 816,
+          "exactMatch": 0.9889705882352942,
+          "tokenAccuracy": 0.9925249169435216,
+          "spanF1": 0.9907300115874856
+        },
+        "source=general-delivery": {
+          "examples": 108,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "source=highway-contract": {
+          "examples": 136,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "source=milepost": {
+          "examples": 181,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "source=military": {
+          "examples": 108,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "source=po-box": {
+          "examples": 362,
+          "exactMatch": 0.994475138121547,
+          "tokenAccuracy": 1,
+          "spanF1": 0.9980392156862746
+        },
+        "source=rural-route": {
+          "examples": 181,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "street-address": {
+          "examples": 12433,
+          "exactMatch": 0.9801335156438511,
+          "tokenAccuracy": 0.9993931155022576,
+          "spanF1": 0.9947424774873709
+        },
+        "no-street": {
+          "examples": 3929,
+          "exactMatch": 0.9954186815983711,
+          "tokenAccuracy": 0.9976418365931474,
+          "spanF1": 0.9972430090586845
+        },
+        "unit": {
+          "examples": 2259,
+          "exactMatch": 0.9034971226206286,
+          "tokenAccuracy": 0.9995549374130737,
+          "spanF1": 0.9790200965391047
+        },
+        "po-box": {
+          "examples": 986,
+          "exactMatch": 0.9959432048681541,
+          "tokenAccuracy": 0.9995169859925938,
+          "spanF1": 0.9987370057320509
+        },
+        "box-route": {
+          "examples": 425,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "general-delivery": {
+          "examples": 108,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "milepost": {
+          "examples": 181,
+          "exactMatch": 1,
+          "tokenAccuracy": 1,
+          "spanF1": 1
+        },
+        "pre-type": {
+          "examples": 379,
+          "exactMatch": 0.9736147757255936,
+          "tokenAccuracy": 0.9936178699641005,
+          "spanF1": 0.9914163090128755
+        },
+        "post-directional": {
+          "examples": 945,
+          "exactMatch": 0.9798941798941799,
+          "tokenAccuracy": 0.9979135618479881,
+          "spanF1": 0.9947748196068673
+        },
+        "not-address": {
+          "examples": 1417,
+          "exactMatch": 0.9880028228652082,
+          "tokenAccuracy": 0.998471667058547,
+          "spanF1": 0.9955477957223919
+        },
+        "junk-only": {
+          "examples": 280,
+          "exactMatch": 0.9892857142857143,
+          "tokenAccuracy": 0.9955223880597015,
+          "spanF1": 0.9902912621359223
+        },
+        "embedded": {
+          "examples": 353,
+          "exactMatch": 0.9830028328611898,
+          "tokenAccuracy": 0.9974326059050064,
+          "spanF1": 0.9955575299866726
+        },
+        "no-commas": {
+          "examples": 2846,
+          "exactMatch": 0.9813773717498243,
+          "tokenAccuracy": 0.9978016180091452,
+          "spanF1": 0.9921668362156664
+        },
+        "all-caps": {
+          "examples": 4450,
+          "exactMatch": 0.9937078651685394,
+          "tokenAccuracy": 0.9987203350395533,
+          "spanF1": 0.9979570331820821
+        },
+        "tokens<=3": {
+          "examples": 3115,
+          "exactMatch": 0.9967897271268058,
+          "tokenAccuracy": 0.9983792544570502,
+          "spanF1": 0.998394863563403
+        },
+        "tokens>=10": {
+          "examples": 1000,
+          "exactMatch": 0.963,
+          "tokenAccuracy": 0.9990867579908675,
+          "spanF1": 0.9926749179085627
+        },
+        "gold=clean": {
+          "examples": 17808,
+          "exactMatch": 0.9864106019766398,
+          "tokenAccuracy": 0.9989129902560838,
+          "spanF1": 0.9956415130094233
+        },
+        "gold=heuristic": {
+          "examples": 2192,
+          "exactMatch": 0.969434306569343,
+          "tokenAccuracy": 0.9975982387083862,
+          "spanF1": 0.9918359297968843
+        },
+        "noise=none": {
+          "examples": 15627,
+          "exactMatch": 0.995648556984706,
+          "tokenAccuracy": 0.998898090022706,
+          "spanF1": 0.9985363132158446
+        },
+        "noise=unit-first": {
+          "examples": 306,
+          "exactMatch": 0.9183006535947712,
+          "tokenAccuracy": 1,
+          "spanF1": 0.9822820694542878
+        },
+        "noise=unit-joined": {
+          "examples": 372,
+          "exactMatch": 0.43010752688172044,
+          "tokenAccuracy": 1,
+          "spanF1": 0.8712831770105767
+        },
+        "noise=drop-zip": {
+          "examples": 387,
+          "exactMatch": 0.9870801033591732,
+          "tokenAccuracy": 1,
+          "spanF1": 0.9962130775056803
+        },
+        "noise=drop-state": {
+          "examples": 500,
+          "exactMatch": 0.982,
+          "tokenAccuracy": 0.9965609476499809,
+          "spanF1": 0.9939870490286772
+        },
+        "noise=zip-before-state": {
+          "examples": 272,
+          "exactMatch": 0.9816176470588235,
+          "tokenAccuracy": 0.9979317476732161,
+          "spanF1": 0.9955103262496259
+        },
+        "noise=newline": {
+          "examples": 708,
+          "exactMatch": 0.9858757062146892,
+          "tokenAccuracy": 0.9974304068522484,
+          "spanF1": 0.995794161306284
+        },
+        "noise=extra-punct": {
+          "examples": 421,
+          "exactMatch": 0.9833729216152018,
+          "tokenAccuracy": 1,
+          "spanF1": 0.9952859192457469
+        },
+        "noise=typo": {
+          "examples": 709,
+          "exactMatch": 0.9816643159379408,
+          "tokenAccuracy": 0.9990621336459554,
+          "spanF1": 0.9943252595155709
+        },
+        "noise=lowercase": {
+          "examples": 744,
+          "exactMatch": 0.9838709677419355,
+          "tokenAccuracy": 0.997697444163021,
+          "spanF1": 0.9947332883187036
+        },
+        "noise=uppercase": {
+          "examples": 494,
+          "exactMatch": 0.9777327935222672,
+          "tokenAccuracy": 0.9965963240299524,
+          "spanF1": 0.9926250747458641
+        }
+      },
+      "invalidPredictions": 0,
+      "abstention": {
+        "junkExamples": 280,
+        "junkAbstained": 0.9892857142857143,
+        "addressExamples": 19720,
+        "addressAbstained": 0.00005070993914807302
+      },
+      "riskCoverage": {
+        "exactAtCoverage": [
+          {
+            "coverage": 1,
+            "exactMatch": 0.98455
+          },
+          {
+            "coverage": 0.9,
+            "exactMatch": 0.9895
+          },
+          {
+            "coverage": 0.8,
+            "exactMatch": 0.990125
+          },
+          {
+            "coverage": 0.5,
+            "exactMatch": 0.9909
+          }
+        ],
+        "aurc": 0.007353863235001244,
+        "atTarget": {
+          "target": 0.99,
+          "threshold": 0.9979625838890954,
+          "coverage": 0.835
+        }
+      },
+      "parseErrors": 0
+    },
+    "memory": {
+      "modelBytes": 503920,
+      "modelGzipBytes": 346264,
+      "loadMs": 4.85812520980835,
+      "firstParseMs": 0.9009580612182617,
+      "modelHeapMB": 0.102020263671875,
+      "modelRssMB": 0.2187957763671875,
+      "peakRssMB": 132.125,
+      "peakRssOverBaselineMB": 2.875274658203125,
+      "baselineRssMB": 93.77466583251953,
+      "peakHeapOverBaselineMB": 18.361087799072266
+    },
+    "bundle": {
+      "entry": "impls/crf/load.ts",
+      "includesTraining": false,
+      "bytes": 19351,
+      "gzipBytes": 7504,
+      "inputs": {
+        "impls/crf/features.ts": 5933,
+        "src/data/street-suffixes.ts": 4428,
+        "impls/crf/model.ts": 2438,
+        "impls/crf/forward-backward.ts": 2005,
+        "src/data/refine.ts": 1548,
+        "src/labels.ts": 1291,
+        "impls/crf/viterbi.ts": 978,
+        "impls/crf/table.ts": 676,
+        "impls/crf/load.ts": 34
+      }
+    },
+    "latency": {
+      "calls": 300000,
+      "meanUs": 13.051701793332933,
+      "p50Us": 12.792,
+      "p90Us": 19.625,
+      "p99Us": 29.375,
+      "p999Us": 45.959,
+      "maxUs": 4055.625,
+      "usPerToken": 2.2290596974224726
+    },
+    "throughput": {
+      "1": {
+        "threads": 1,
+        "callsPerSec": 77982.96381527555,
+        "tokensPerSec": 456609.74887939217,
+        "runs": [
+          77982.96381527555,
+          77114.797964254,
+          77990.39344302595,
+          77533.91233808703,
+          78262.52045221024
+        ]
+      },
+      "4": {
+        "threads": 4,
+        "callsPerSec": 306645.42989996506,
+        "tokensPerSec": 1795485.6534217703,
+        "runs": [
+          306645.42989996506,
+          303064.2895083097,
+          312819.5136212053,
+          307021.36847902753,
+          297448.1260567853
+        ]
+      }
+    },
+    "determinism": {
+      "identical": true,
+      "hashes": [
+        "40622cde6ed636d5",
+        "40622cde6ed636d5"
+      ]
+    },
+    "learningCurve": [
+      {
+        "trainExamples": 5000,
+        "exactMatch": 0.94905,
+        "tokenAccuracy": 0.9877544746550075
+      },
+      {
+        "trainExamples": 50000,
+        "exactMatch": 0.97425,
+        "tokenAccuracy": 0.995610739172018
+      },
+      {
+        "trainExamples": 500000,
+        "exactMatch": 0.98455,
+        "tokenAccuracy": 0.9987447055608689
+      }
+    ]
+  }
+}

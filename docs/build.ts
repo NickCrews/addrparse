@@ -24,13 +24,21 @@ import { ensureModel, gitInfo } from "../src/eval/models.ts";
 import { loadRuns, trainBlendOf, type RunResult } from "../src/eval/results.ts";
 import { LABEL_NAMES } from "../src/labels.ts";
 import { asScoredParse, type ScoredParse, type Span } from "../src/types.ts";
+import { readAttribution } from "./attribution.ts";
 import { pickDemo, type ModelPredictions } from "./demo.ts";
 import type { PageData } from "./page-data.ts";
 import { renderPage, type DataStats, type PageContext } from "./page.ts";
 import { LOADERS } from "./parsers.ts";
 
 /** Parsed on the Home tab. Written for the page, not taken from the data. */
-const EXAMPLE_TEXT = "1600 N Pennsylvania Ave NW Apt 2, Washington, DC 20500";
+const EXAMPLE_TEXT = "CO John SMITH, 123 E St elias stree S,   Oklahoma City, OK 99507-1234";
+/** Notes on the Home tab example, by span text; shown only when the span has that text. */
+const EXAMPLE_NOTES: Record<string, string> = {
+  "CO John SMITH": "the recipient isn't part of the address",
+  "St elias": '"St" isn\'t mistaken for Street',
+  stree: "the typo is still the street type",
+  "Oklahoma City": '"Oklahoma" isn\'t mistaken for the state',
+};
 /** Parsers the page describes, besides those with a run; noop is the harness's floor. */
 const SKIP = new Set(["noop"]);
 
@@ -140,19 +148,6 @@ const stats = existsSync(DATA_STATS_PATH)
   ? (JSON.parse(readFileSync(DATA_STATS_PATH, "utf8")) as DataStats)
   : undefined;
 
-/** The model attribution blockquote under "Distributing a trained model" in README.md. */
-function readmeAttribution(): string {
-  const readme = readFileSync(join(ROOT, "README.md"), "utf8");
-  const m = /Ship this attribution[^\n]*\n\n((?:[ \t]*>[^\n]*\n)+)/.exec(readme);
-  if (!m) throw new Error("README.md: attribution blockquote not found");
-  return m[1]!
-    .split("\n")
-    .map((l) => l.replace(/^\s*>\s?/, ""))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 const example = parsers[best]!(EXAMPLE_TEXT);
 const git = gitInfo();
 const ctx: PageContext = {
@@ -165,8 +160,14 @@ const ctx: PageContext = {
   runNotes,
   embedded: embeddedSizes,
   stats,
-  attribution: readmeAttribution(),
-  example: { impl: best, text: EXAMPLE_TEXT, spans: example.spans, confidence: example.confidence },
+  attribution: readAttribution(),
+  example: {
+    impl: best,
+    text: EXAMPLE_TEXT,
+    spans: example.spans,
+    confidence: example.confidence,
+    notes: EXAMPLE_NOTES,
+  },
   demo: { sets: demo.sets.length, rows: Object.keys(demo.rows).length },
   generated: {
     at: new Date().toISOString().slice(0, 10),

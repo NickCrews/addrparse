@@ -1,0 +1,39 @@
+{
+  "name": "addrparse",
+  "version": "0.1.0",
+  "description": "US address parser: a trained linear-chain CRF in plain JavaScript, no dependencies, for Node and browsers",
+  "keywords": [
+    "address",
+    "address-parser",
+    "crf",
+    "geocoding",
+    "parse",
+    "us",
+    "usaddress"
+  ],
+  "homepage": "https://github.com/NickCrews/addrparse#readme",
+  "bugs": "https://github.com/NickCrews/addrparse/issues",
+  "license": "MIT",
+  "author": "Nick Crews",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NickCrews/addrparse.git"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

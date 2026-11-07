@@ -51,9 +51,16 @@ export interface PageContext {
   /** Models embedded in the page: raw and gzip bytes. */
   embedded: Record<string, { bytes: number; gzipBytes: number }>;
   stats?: DataStats;
-  /** The model attribution paragraph from README.md, as plain text. */
+  /** The model attribution paragraph from CONTRIBUTING.md, as plain text. */
   attribution: string;
-  example: { impl: string; text: string; spans: Span[]; confidence?: number };
+  example: {
+    impl: string;
+    text: string;
+    spans: Span[];
+    confidence?: number;
+    /** Span text → a note shown next to that span. */
+    notes: Record<string, string>;
+  };
   demo: { sets: number; rows: number };
   generated: { at: string; git: string };
 }
@@ -141,21 +148,25 @@ function home(ctx: PageContext): string {
 <p>is parsed to a sequence of tokens:</p>
 <p class="parsed">${spansHtml(ex.text, ex.spans)}</p>
 ${table(
-  ["label", "text", "start", "end"],
-  ex.spans.map((s) => [
-    `<mark class="lab" data-label="${s.label}">${s.label}</mark>`,
-    esc(ex.text.slice(s.start, s.end)),
-    String(s.start),
-    String(s.end),
-  ]),
-  { align: ["l", "l", "r", "r"] },
+  ["label", "text", "start", "end", "note"],
+  ex.spans.map((s) => {
+    const text = ex.text.slice(s.start, s.end);
+    return [
+      `<mark class="lab" data-label="${s.label}">${s.label}</mark>`,
+      esc(text),
+      String(s.start),
+      String(s.end),
+      esc(ex.notes[text] ?? ""),
+    ];
+  }),
+  { align: ["l", "l", "r", "r", "l"] },
 )}
 
 <h2 id="home-goals">What</h2>
 ${list([
-  "99.87% per-token accuracy, 97.50% exact match.",
-  "Run anywhere: Zero dependencies, pure typescript, 335.kb gzipped model size.",
-  "Performant: ~100k/sec per thread, 21us p99 latency, peak memory of 17Mb (all on M1 Mac).",
+  "99.87% per-token accuracy, 98.45% exact match.",
+  "Run anywhere: Zero dependencies, pure typescript, 338 KB gzipped model size.",
+  "Performant: ~78k/sec per thread, 29us p99 latency, peak memory of 18Mb (all on M1 Mac).",
   "Say how sure each parse is, so a caller can accept confident parses and review the rest.",
   "Recognize text that is not an address and label it <code>NotAddress</code> instead of forcing a parse.",
   "Every claim backed by a saved, reproducible measurement (the Metrics tab).",
@@ -167,24 +178,22 @@ FGDC United States Thoroughfare, Landmark, and Postal Address Data Standard.</p>
 ${table(["label", "meaning", "example"], labelRows, { cls: "labels" })}
 
 <h2 id="home-usage">Usage</h2>
-<p>Each parser is a <code>load</code> function that takes the model bytes and returns an object with
-a synchronous <code>parse</code>:</p>
-<pre><code>import { load } from "./impls/crf/load.ts";
+<p>The <code>addrparse</code> npm package is the <code>crf</code> parser with its model embedded:</p>
+<pre><code>npm install addrparse</code></pre>
+<pre><code>import { parse } from "addrparse";
 
-const parser = load(modelBytes); // Uint8Array
-const { spans, confidence } = parser.parse("12 N Main St Apt 4, Springfield, IL 62701");
-// spans: [{ start: 0, end: 2, label: "AddressNumber" }, …]
+const { spans, confidence } = parse("12 N Main St Apt 4, Springfield, IL 62701");
+// spans: [{ start: 0, end: 2, label: "AddressNumber", text: "12" }, …]
 // confidence: probability that the whole labeling is right, in [0, 1]</code></pre>
 ${list([
   "Spans are character ranges <code>[start, end)</code> of the input, sorted and non-overlapping. Text outside every span (spaces, commas) has no label.",
-  "Parsing has no side effects and needs no network or file access; load the model once and reuse the parser.",
+  "Parsing has no side effects and needs no network or file access. The model is decoded on the first call.",
   "To abstain, treat a parse as unusable when its confidence is below a threshold, or when every span is <code>NotAddress</code>. The Metrics tab shows what each threshold costs.",
 ])}
 
 <h2 id="home-status">Status</h2>
 ${list([
-  "Not published to npm. Use it from a clone of the repository.",
-  "Trained models aren't distributed separately; this page embeds them for the playground.",
+  "The npm package ships only <code>crf</code>. The other parsers run from a clone of the repository.",
   "US addresses only.",
 ])}
 </section>`;
@@ -457,7 +466,7 @@ ${list([
   `The method of making the training data is <a href="https://github.com/NickCrews/addrparse/tree/main/src/data">src/data/</a> in the repository.`,
   "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
 ])}
-<p>This is a reading of the licenses, not legal advice; see the repository README.</p>
+<p>This is a reading of the licenses, not legal advice; see the repository's CONTRIBUTING.md.</p>
 </section>`;
 }
 

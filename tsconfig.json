@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "impls", "test", "docs", "datasets", "eval.config.ts"]
+  "include": ["src", "impls", "package", "test", "docs", "datasets", "eval.config.ts"]
 }
