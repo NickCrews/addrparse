@@ -4,13 +4,16 @@
  * from libpostal's coarser labels.
  */
 export const LABELS = {
-  AddressNumber: "House number: 123, 123A, 1/2",
+  AddressNumber: "House number: 123, 123A, 45-29",
+  AddressNumberSuffix:
+    "Letter, letter+digit or fraction as its own word after the number: 12 B, 12 1/2",
+  StreetNamePreModifier: "Word before a pre-typed road that is not part of its name: Old Highway 9",
   StreetNamePreDirectional: "Directional before the street name: N, Northwest",
   StreetNamePreType: "Street type before the name: Highway 9, County Road 1147",
   StreetName: "The street name itself: Main, Martin Luther King",
   StreetNamePostType: "Street type after the name: St, Avenue",
   StreetNamePostDirectional: "Directional after the street type: Main St NE",
-  OccupancyType: "Unit designator: Apt, Suite, #, Floor",
+  OccupancyType: "Unit designator: Apt, Suite, #, Floor, / F; or a numberless level: Basement, Gf",
   OccupancyIdentifier: "Unit number: 4B, 2009",
   USPSBoxType: "PO box designator: PO Box, P.O. Box",
   USPSBoxID: "PO box number",

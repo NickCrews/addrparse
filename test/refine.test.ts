@@ -3,14 +3,22 @@ import { describe, it } from "node:test";
 import { parseLine } from "../src/data/libpostal.ts";
 import {
   refine,
+  refineHouseNumber,
   refineOccupancy,
   refinePoBox,
   refineRoad,
   type RefineResult,
 } from "../src/data/refine.ts";
 import type { Label } from "../src/labels.ts";
+import { labeledTokens, spansFromTokens, tokenize } from "../src/tokens.ts";
 
 const road = (s: string) => refineRoad(s.split(" "), []);
+const roadNotes = (s: string) => {
+  const notes: string[] = [];
+  refineRoad(s.split(" "), notes);
+  return notes;
+};
+const unit = (s: string) => refineOccupancy(s.split(" "), []);
 
 /** Refines a libpostal tagged string, e.g. "12/house_number Main/road |/FSEP Kenai/city". */
 function run(tagged: string, fieldSeparator = ", "): RefineResult {
@@ -149,6 +157,140 @@ describe("refineRoad", () => {
   });
 });
 
+describe("refineRoad: ambiguous splits", () => {
+  it("labels a split compound directional before a word name as the directional", () => {
+    assert.deepEqual(road("S West Temple St"), [
+      "StreetNamePreDirectional",
+      "StreetNamePreDirectional",
+      "StreetName",
+      "StreetNamePostType",
+    ]);
+    assert.ok(roadNotes("S West Temple St").includes("road:split-directional"));
+  });
+
+  it("labels a road of two directionals as a pre-directional and a name, and notes it", () => {
+    assert.deepEqual(road("E NRTH"), ["StreetNamePreDirectional", "StreetName"]);
+    assert.ok(roadNotes("E North").includes("road:directional-or-name"));
+  });
+
+  it("labels Old before a pre-typed road as the pre-modifier", () => {
+    assert.deepEqual(road("Old Hwy 9"), [
+      "StreetNamePreModifier",
+      "StreetNamePreType",
+      "StreetName",
+    ]);
+    assert.deepEqual(road("OLD STATE RD 56"), [
+      "StreetNamePreModifier",
+      "StreetNamePreType",
+      "StreetNamePreType",
+      "StreetName",
+    ]);
+    assert.deepEqual(road("N Old Hwy 9 S"), [
+      "StreetNamePreDirectional",
+      "StreetNamePreModifier",
+      "StreetNamePreType",
+      "StreetName",
+      "StreetNamePostDirectional",
+    ]);
+  });
+
+  it("keeps Old in the name when no pre-typed road follows", () => {
+    assert.deepEqual(road("Old Mill Rd"), ["StreetName", "StreetName", "StreetNamePostType"]);
+    assert.deepEqual(road("Old Hwy"), ["StreetName", "StreetNamePostType"]);
+  });
+
+  it("labels Spanish pre-types before a number", () => {
+    assert.deepEqual(road("Calle 9"), ["StreetNamePreType", "StreetName"]);
+    assert.deepEqual(road("Carr 2"), ["StreetNamePreType", "StreetName"]);
+  });
+
+  it("keeps a leading type in the name before a word and notes it", () => {
+    assert.deepEqual(road("Calle Real"), ["StreetName", "StreetName"]);
+    assert.ok(roadNotes("Calle Real").includes("road:leading-type-in-name"));
+    assert.ok(roadNotes("Avenue of the Americas").includes("road:leading-type-in-name"));
+  });
+
+  it("labels a letter-digit route number as the name", () => {
+    assert.deepEqual(road("Highway A1A"), ["StreetNamePreType", "StreetName"]);
+  });
+
+  it("labels I H and U S as one pre-type", () => {
+    assert.deepEqual(road("S I H 20"), [
+      "StreetNamePreDirectional",
+      "StreetNamePreType",
+      "StreetNamePreType",
+      "StreetName",
+    ]);
+    assert.deepEqual(road("U S 9"), ["StreetNamePreType", "StreetNamePreType", "StreetName"]);
+    assert.deepEqual(road("U S Hwy 9"), [
+      "StreetNamePreType",
+      "StreetNamePreType",
+      "StreetNamePreType",
+      "StreetName",
+    ]);
+  });
+
+  it("labels only the last of stacked types as the post-type", () => {
+    assert.deepEqual(road("Village Gn Dr"), ["StreetName", "StreetName", "StreetNamePostType"]);
+    assert.deepEqual(road("Bay St Ext"), ["StreetName", "StreetName", "StreetNamePostType"]);
+    assert.ok(roadNotes("Bay St Ext").includes("road:stacked-type"));
+    assert.ok(!roadNotes("Mill Creek Rd").includes("road:stacked-type"));
+  });
+
+  it("labels a directional after stacked types as the post-directional", () => {
+    assert.deepEqual(road("Main Street Sth"), [
+      "StreetName",
+      "StreetNamePostType",
+      "StreetNamePostDirectional",
+    ]);
+  });
+});
+
+describe("refineHouseNumber", () => {
+  it("labels a separate letter or fraction after the number as the suffix", () => {
+    assert.deepEqual(refineHouseNumber(["1833", "B"], []), [
+      "AddressNumber",
+      "AddressNumberSuffix",
+    ]);
+    assert.deepEqual(refineHouseNumber(["5157", "1", "/", "2"], []), [
+      "AddressNumber",
+      "AddressNumberSuffix",
+      "AddressNumberSuffix",
+      "AddressNumberSuffix",
+    ]);
+    assert.deepEqual(refineHouseNumber(["1203", "C2"], []), [
+      "AddressNumber",
+      "AddressNumberSuffix",
+    ]);
+  });
+
+  it("labels a unicode fraction as the suffix", () => {
+    assert.deepEqual(refineHouseNumber(["5218", "½"], []), [
+      "AddressNumber",
+      "AddressNumberSuffix",
+    ]);
+  });
+
+  it("labels N, S, E or W after the number as the road's pre-directional, and notes it", () => {
+    const notes: string[] = [];
+    assert.deepEqual(refineHouseNumber(["680", "E"], notes), [
+      "AddressNumber",
+      "StreetNamePreDirectional",
+    ]);
+    assert.deepEqual(notes, ["house_number:directional"]);
+  });
+
+  it("keeps attached suffixes, ranges and words in the number", () => {
+    assert.deepEqual(refineHouseNumber(["193E"], []), ["AddressNumber"]);
+    assert.deepEqual(
+      refineHouseNumber(["125", "/", "127"], []),
+      new Array(3).fill("AddressNumber"),
+    );
+    assert.deepEqual(refineHouseNumber(["Nº", "3033"], []), ["AddressNumber", "AddressNumber"]);
+    assert.deepEqual(refineHouseNumber(["404", "Rear"], []), ["AddressNumber", "AddressNumber"]);
+  });
+});
+
 describe("refineOccupancy", () => {
   it("labels leading designators as type and the rest as identifier", () => {
     assert.deepEqual(refineOccupancy(["Apt", "#", "4B"], []), [
@@ -183,6 +325,38 @@ describe("refineOccupancy", () => {
       "OccupancyIdentifier",
       "OccupancyType",
     ]);
+  });
+
+  it("splits Hong Kong floor notation into identifier and type, and notes it", () => {
+    const notes: string[] = [];
+    assert.deepEqual(refineOccupancy(["9", "/", "F"], notes), [
+      "OccupancyIdentifier",
+      "OccupancyType",
+      "OccupancyType",
+    ]);
+    assert.deepEqual(notes, ["unit:slash-level"]);
+    assert.deepEqual(unit("G / F"), ["OccupancyIdentifier", "OccupancyType", "OccupancyType"]);
+    assert.deepEqual(unit("Gd / Fl"), ["OccupancyIdentifier", "OccupancyType", "OccupancyType"]);
+  });
+
+  it("labels levels that take no number as type", () => {
+    for (const s of ["Basement", "Upstairs", "Cellar", "Gf", "Ug", "Ugfl", "Lg", "Tf", "Bajos"]) {
+      assert.deepEqual(unit(s), ["OccupancyType"], s);
+    }
+    assert.deepEqual(unit("Sub Basement"), ["OccupancyType", "OccupancyType"]);
+  });
+
+  it("labels a platform after its number as the type", () => {
+    assert.deepEqual(unit("4th Platform"), ["OccupancyIdentifier", "OccupancyType"]);
+  });
+
+  it("labels Upper or Lower before a level name as part of the identifier", () => {
+    assert.deepEqual(unit("Upper Ground Floor"), [
+      "OccupancyIdentifier",
+      "OccupancyIdentifier",
+      "OccupancyType",
+    ]);
+    assert.deepEqual(unit("Lower Level"), ["OccupancyType", "OccupancyType"]);
   });
 
   it("notes a unit with no designator", () => {
@@ -262,6 +436,57 @@ describe("refine", () => {
       ["Kansas", "PlaceName"],
       ["City", "PlaceName"],
     ]);
+  });
+
+  it("renders a comma between fields whose same-label tokens would touch", () => {
+    const tagged = "4th/level Fl/level |/FSEP Apt/unit 3/unit |/FSEP Kenai/city";
+    const r = ok(tagged, " ");
+    assert.equal(r.text, "4th Fl, Apt 3 Kenai");
+    assert.ok(r.notes.includes("render:comma-between-fields"));
+    assert.deepEqual(spans(tagged, " ").slice(0, 4), [
+      ["4th", "OccupancyIdentifier"],
+      ["Fl", "OccupancyType"],
+      ["Apt", "OccupancyType"],
+      ["3", "OccupancyIdentifier"],
+    ]);
+    assert.equal(ok("Fl/level 7/level |/FSEP Apt/unit 3/unit", " ").text, "Fl 7 Apt 3");
+    assert.equal(ok(tagged).text, "4th Fl, Apt 3, Kenai");
+    assert.equal(ok("4th/level Fl/level ;/SEP Apt/unit 3/unit", " ").text, "4th Fl; Apt 3");
+  });
+
+  it("produces gold spans that per-token labels reproduce", () => {
+    const lines = [
+      "4th/level Fl/level |/FSEP Apt/unit 3/unit |/FSEP Kenai/city",
+      "Upper/level Ground/level Floor/level |/FSEP Basement/unit |/FSEP Kenai/city",
+      "1833/house_number B/house_number Old/road Hwy/road 9/road |/FSEP Kenai/city",
+      "680/house_number E/house_number E/road Main/road St/road",
+      "2/level //level F/level |/FSEP #/unit 3/unit",
+    ];
+    for (const sep of [", ", " "]) {
+      for (const tagged of lines) {
+        const r = ok(tagged, sep);
+        const ex = { id: "", text: r.text, spans: r.spans, source: "" };
+        const labels = labeledTokens(ex).map((t) => t.label);
+        assert.deepEqual(spansFromTokens(tokenize(r.text), labels), r.spans, r.text);
+      }
+    }
+  });
+
+  it("labels house number suffixes", () => {
+    assert.deepEqual(spans("1833/house_number B/house_number Main/road St/road"), [
+      ["1833", "AddressNumber"],
+      ["B", "AddressNumberSuffix"],
+      ["Main", "StreetName"],
+      ["St", "StreetNamePostType"],
+    ]);
+  });
+
+  it("rejects venue names tagged as the city", () => {
+    const r = run(
+      "12/house_number Main/road |/FSEP Comfort/city Inn/city Fruita/city ,/SEP CO/state",
+    );
+    assert.deepEqual(r.ok ? undefined : r.reason, "venue-as-city");
+    assert.ok(ok("Fountain/city Inn/city ,/SEP SC/state").ok);
   });
 
   it("drops removed fields and collapses the separators around them", () => {

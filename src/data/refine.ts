@@ -8,8 +8,9 @@
  *
  * | libpostal            | here                                                              |
  * | -------------------- | ----------------------------------------------------------------- |
- * | house_number         | AddressNumber                                                     |
- * | road                 | StreetNamePre/PostDirectional, StreetNamePre/PostType, StreetName |
+ * | house_number         | AddressNumber, AddressNumberSuffix                                |
+ * | road                 | StreetNamePreModifier, StreetNamePre/PostDirectional,             |
+ * |                      | StreetNamePre/PostType, StreetName                                |
  * | unit, level          | OccupancyType, OccupancyIdentifier                                |
  * | po_box               | USPSBoxType, USPSBoxID                                            |
  * | city                 | PlaceName                                                         |
@@ -20,8 +21,27 @@
  * | everything else      | field removed from the text (suburb, county, venue name, ...)     |
  *
  * A line is rejected when its road is a data-entry placeholder ("UNKNOWN", "NO SITUS",
- * "Unnamed Road") or when a kept field is in a non-Latin script (libpostal's translations of
- * state and country names into Japanese, Russian, ...).
+ * "Unnamed Road"), when its city is a venue name (`VENUE_CITY`), or when a kept field is in a
+ * non-Latin script (libpostal's translations of state and country names into Japanese,
+ * Russian, ...).
+ *
+ * Road policies where the split is ambiguous:
+ * - A compound directional split in two ("S E Main St", "Sth Wst 28th St") is the directional,
+ *   so "S West Temple St" gets West as a directional too. libpostal's noise writes Portland's
+ *   "SE Division St" as "S East Division St" ~4x as often as a literal "S West Temple St"
+ *   occurs; `road:split-directional` counts both.
+ * - A road of two directionals ("E North") is a pre-directional and a name.
+ * - "Old" before a pre-typed road is StreetNamePreModifier ("Old Hwy 9"); elsewhere it's part
+ *   of the name ("Old Mill Rd").
+ * - A pre-type followed by a word rather than a number or letter is part of the name
+ *   ("Avenue of the Americas", "Calle Real"); `road:leading-type-in-name` counts them.
+ * - Of stacked types, only the last is the post-type ("Village Green Dr", "Bay St Ext");
+ *   `road:stacked-type` counts them.
+ *
+ * Unit policies: "2 / F" and "G / F" (Hong Kong floor notation) are identifier "2" and type
+ * "/ F". Levels with no number ("Basement", "Upstairs", "Gf") are OccupancyType. Two unit
+ * fields whose same-label tokens would touch with only a space between ("4th Fl Apt 3") are
+ * rendered with ", " between them, so they stay two spans a tokenizer can tell apart.
  *
  * libpostal abbreviates and truncates words on purpose as noise ("Wst" for West, "Roa" for
  * Road, "Aprt" for Apartment); the rules accept those spellings.
@@ -73,12 +93,24 @@ export const OCCUPANCY_TYPES: ReadonlySet<string> = new Set([
   // libpostal's abbreviations and translations
   ...["ap", "aprt", "aptmnt", "apto", "apartamento", "u", "un", "unt", "flt", "flat", "door"],
   ...["offc", "nbr", "nmbr", "num", "nr", "№", "nº", "lev", "levl", "lvel", "story", "piso"],
+  // Levels written as one word with no number are the type, like "Basement": "Ug", "Gf",
+  // "Tf", "Lg" (upper ground, ground, top, lower ground floor), "Pb", "Bajos" (planta baja).
+  // Written as two words they split into identifier and type ("Ground Floor", "G / F").
+  ...["upstairs", "downstairs", "cellar", "mezzanine", "mezz", "ug", "ugf", "ugfl", "gf"],
+  ...["gdfl", "tf", "lg", "pb", "bajo", "bajos", "bjs", "sótano", "sotano"],
 ]);
 
 /** Words that can follow a level's identifier ("3rd Floor", "2 Lvl"). */
 const LEVEL_TYPES: ReadonlySet<string> = new Set([
   ...["fl", "floor", "flr", "level", "lvl", "lev", "levl", "lvel", "story", "piso"],
+  ...["platform", "pf"],
 ]);
+
+/** Words after "/" in Hong Kong floor notation ("2 / F", "G / F", "5 / L"). */
+const SLASH_LEVEL_TYPES: ReadonlySet<string> = new Set(["f", "fl", "flr", "floor", "l", "lvl"]);
+
+/** Designators that name a level when followed by more level name ("Upper Ground Floor"). */
+const LEVEL_QUALIFIERS: ReadonlySet<string> = new Set(["upper", "uppr", "lower", "lowr"]);
 
 /** Two-letter codes of the states, DC and the inhabited territories. */
 export const STATE_CODES: ReadonlySet<string> = new Set([
@@ -122,12 +154,37 @@ const PRE_TYPE_CORES: ReadonlySet<string> = new Set([
 ]);
 /** Qualifiers after which "R" is a core word too ("C R 9", "CTY R 9"). */
 const COUNTY_QUALIFIERS: ReadonlySet<string> = new Set(["county", "co", "cty", "c"]);
+/** Multi-word pre-types that need no core word: "I H 35" (Interstate Highway), "U S 9". */
+const MULTIWORD_PRE_TYPES: readonly (readonly string[])[] = [
+  ["i", "h"],
+  ["u", "s"],
+];
 const STANDALONE_PRE_TYPES: ReadonlySet<string> = new Set([
   ...["highway", "hwy", "hywy", "route", "rte", "rt", "interstate", "i", "ih", "avenue", "ave"],
+  ...["av"],
   ...["road", "rd", "loop", "spur", "us"],
+  // Spanish (Puerto Rico, the Southwest): "Calle 9", "Carr 2"
+  ...["calle", "avenida", "carretera", "carr", "camino"],
   // Texas farm/ranch-to-market roads; county, state, township, private and ranch roads;
   // Wisconsin county, state and US trunk highways
   ...["fm", "rm", "cr", "sr", "sh", "tr", "pr", "rr", "cth", "sth", "ush"],
+]);
+
+/** Pre-type words that start roads whose name is a word ("Avenue of the Americas"). */
+const LEADING_TYPE_WORDS: ReadonlySet<string> = new Set([
+  ...["avenue", "ave", "av", "highway", "hwy", "route", "rte", "calle", "avenida", "camino"],
+  ...["carretera", "paseo", "via"],
+]);
+
+/**
+ * Street types that are rarely a word of a name, so a road with one before its post-type has
+ * stacked types ("Bay St Ext", "Eastern Parkway Extension"). Words like "Creek" and "Hill" are
+ * types too but are usually the name ("Mill Creek Rd").
+ */
+const THOROUGHFARE_TYPES: ReadonlySet<string> = new Set([
+  ...["st", "street", "rd", "road", "ave", "avenue", "av", "dr", "drive", "ln", "lane", "blvd"],
+  ...["boulevard", "ct", "court", "pl", "place", "pkwy", "parkway", "hwy", "highway", "cir"],
+  ...["circle", "ter", "terrace", "way"],
 ]);
 
 /** Roads that are data-entry placeholders, matched against the road's normalized words. */
@@ -137,7 +194,17 @@ const PLACEHOLDER_ROAD =
 /** Truncations of street suffixes that are more often whole words in street names. */
 const NOT_TRUNCATED_SUFFIXES: ReadonlySet<string> = new Set([
   ...["bay", "gate", "high", "cross", "sky", "fe", "ann", "villa", "mead", "can", "comm", "par"],
+  ...["valle"],
 ]);
+
+/**
+ * City fields that are an OSM venue name rather than a place, matched against the field's
+ * normalized words. "Comfort Inn Fruita" is one OSM hotel's addr:city, on ~500 lines of
+ * libpostal's sample. City fields that start with venue words (Inn, Mall, Church, ...) or equal
+ * a venue name elsewhere in the sample are otherwise real places ("Fountain Inn", "Falls
+ * Church"), so no general rule is applied.
+ */
+const VENUE_CITY = /^comfort inn\b/;
 
 /** Fields whose tokens are removed from the rendered text. */
 const DROPPED = new Set([
@@ -157,7 +224,6 @@ const DROPPED = new Set([
 ]);
 
 const SIMPLE: Record<string, Label> = {
-  house_number: "AddressNumber",
   city: "PlaceName",
   state: "StateName",
   postcode: "ZipCode",
@@ -183,7 +249,7 @@ export function norm(token: string): string {
 }
 
 function isIdLike(token: string): boolean {
-  return /^(\d+[a-z]?|[a-z]|\d+-\d+)$/i.test(norm(token));
+  return /^(\d+[a-z]?|[a-z]\d+[a-z]?|[a-z]|\d+-\d+)$/i.test(norm(token));
 }
 
 /** "std" for a standard directional, "abbrev" for one of libpostal's spellings. */
@@ -218,6 +284,9 @@ function preTypeLength(t: readonly string[], start: number): number {
       return tokensTo(q.length + 1);
     }
   }
+  for (const q of MULTIWORD_PRE_TYPES) {
+    if (q.every((w, k) => words[k]?.word === w) && endsToken(q.length)) return tokensTo(q.length);
+  }
   // "NE" is Nebraska's code but in a road it's the directional.
   const stateCode = STATE_CODES.has(first) && !directional(first) && endsToken(1);
   // State code before a pre-type: "VT Route 9", "LA HWY 9"
@@ -230,13 +299,15 @@ function preTypeLength(t: readonly string[], start: number): number {
 }
 
 /**
- * Labels a road whose type comes first: [PreDirectional] PreType Name [PostType]
- * [PostDirectional], where Name is one or two ID-like tokens ("9", "1147 A", "J").
- * Returns undefined when the road isn't of that form.
+ * Labels a road whose type comes first: [PreDirectional] [PreModifier] PreType Name [PostType]
+ * [PostDirectional], where Name is one or two ID-like tokens ("9", "1147 A", "J") and
+ * PreModifier is "Old". Returns undefined when the road isn't of that form.
  */
 function refinePreTypeRoad(tokens: readonly string[], t: readonly string[]): Label[] | undefined {
   const n = tokens.length;
-  for (const start of directional(t[0]!) && n >= 3 ? [0, 1] : [0]) {
+  for (const dirEnd of directional(t[0]!) && n >= 3 ? [0, 1] : [0]) {
+    const modified = t[dirEnd] === "old";
+    const start = dirEnd + (modified ? 1 : 0);
     const len = preTypeLength(t, start);
     if (len === 0) continue;
     const labels: Label[] = new Array(n).fill("StreetName");
@@ -252,7 +323,8 @@ function refinePreTypeRoad(tokens: readonly string[], t: readonly string[]): Lab
     if (name < 1 || name > 2 || !nameTokens.every(isIdLike)) continue;
     // "Sth" is Wisconsin's numbered state trunk highway, or libpostal's "South" ("Sth W Dr").
     if (len === 1 && directional(t[start]!) && !nameTokens.some((tok) => /\d/.test(tok))) continue;
-    if (start === 1) labels[0] = "StreetNamePreDirectional";
+    if (dirEnd === 1) labels[0] = "StreetNamePreDirectional";
+    if (modified) labels[dirEnd] = "StreetNamePreModifier";
     for (let k = start; k < start + len; k++) labels[k] = "StreetNamePreType";
     return labels;
   }
@@ -276,16 +348,24 @@ export function refineRoad(tokens: readonly string[], notes: string[]): Label[] 
     notes.push("road:pre-type");
     const k = preTyped.indexOf("StreetNamePreType");
     const bare = preTyped[k + 1] !== "StreetNamePreType";
-    if (bare && (STATE_CODES.has(t[k]!) || t[k] === "us")) notes.push("road:state-route");
+    if (bare && (STATE_CODES.has(t[k]!) || t[k] === "us" || t[k] === "u"))
+      notes.push("road:state-route");
     noteDirectional(preTyped);
     return preTyped;
+  }
+
+  if (n === 2 && directional(t[0]!) && directional(t[1]!)) {
+    notes.push("road:directional-or-name");
+    const labels: Label[] = ["StreetNamePreDirectional", "StreetName"];
+    noteDirectional(labels);
+    return labels;
   }
 
   const labels: Label[] = new Array(n).fill("StreetName");
   let i = 0;
   let j = n;
   // A compound directional split in two ("Nrth Wst", "South West"). Before the name this is
-  // a guess: "S West Temple St" has West in the name.
+  // a guess; see the policy in the header ("S West Temple St").
   const split = (k: number) =>
     NORTH_SOUTH.has(t[k]!.replace(/\./g, "")) && EAST_WEST.has(t[k + 1]!.replace(/\./g, ""));
   if (j - i >= 3 && split(j - 2)) {
@@ -311,6 +391,15 @@ export function refineRoad(tokens: readonly string[], notes: string[]): Label[] 
   if (n === 1 && (directional(t[0]!) || STREET_SUFFIXES.has(t[0]!))) {
     notes.push("road:lone-type-or-directional");
   }
+  if (j - i >= 2 && LEADING_TYPE_WORDS.has(t[i]!)) notes.push("road:leading-type-in-name");
+  if (
+    j < n &&
+    labels[j] === "StreetNamePostType" &&
+    j - i >= 2 &&
+    THOROUGHFARE_TYPES.has(t[j - 1]!)
+  ) {
+    notes.push("road:stacked-type");
+  }
   noteDirectional(labels);
   return labels;
 }
@@ -335,15 +424,23 @@ function isSuffix(token: string, notes: string[]): boolean {
  * Leading designator words are OccupancyType and the rest OccupancyIdentifier ("Apt # 4B").
  * An unknown word counts as a designator when it is alphabetic, longer than one letter, and
  * followed by something other than level words ("Apto 9", "Door # 12", but "Ground Floor").
- * A level word after the identifier is OccupancyType too ("3rd Floor", "Ninth Fl").
+ * A level word after the identifier is OccupancyType too ("3rd Floor", "Ninth Fl"), and
+ * "Upper"/"Lower" before more level name is part of the identifier ("Upper Ground Floor").
+ * "2 / F" is identifier "2" and type "/ F".
  */
 export function refineOccupancy(tokens: readonly string[], notes: string[]): Label[] {
   const labels: Label[] = tokens.map(() => "OccupancyIdentifier");
   const t = tokens.map(norm);
   const last = tokens.length - 1;
+  if (tokens.length === 3 && tokens[1] === "/" && SLASH_LEVEL_TYPES.has(t[2]!)) {
+    notes.push("unit:slash-level");
+    return ["OccupancyIdentifier", "OccupancyType", "OccupancyType"];
+  }
   let k = 0;
   while (k <= last) {
-    if (OCCUPANCY_TYPES.has(t[k]!)) {
+    if (LEVEL_QUALIFIERS.has(t[k]!) && k < last - 1 && LEVEL_TYPES.has(t[last]!)) {
+      break;
+    } else if (OCCUPANCY_TYPES.has(t[k]!)) {
       labels[k++] = "OccupancyType";
     } else if (
       k < last &&
@@ -359,6 +456,25 @@ export function refineOccupancy(tokens: readonly string[], notes: string[]): Lab
     notes.push("unit:trailing-type");
   } else if (k === 0) {
     notes.push("unit:no-type");
+  }
+  return labels;
+}
+
+/**
+ * A letter or fraction written as its own word after a numeric house number is
+ * AddressNumberSuffix ("1833 B", "5157 1 / 2", "12 ½", "1203 C2"). N, S, E or W there is the
+ * road's pre-directional that libpostal put in the number field ("680 E", then "Oakwood Ave").
+ * Everything else is AddressNumber.
+ */
+export function refineHouseNumber(tokens: readonly string[], notes: string[]): Label[] {
+  const labels: Label[] = tokens.map(() => "AddressNumber");
+  const rest = tokens.slice(1).join(" ");
+  if (!/^\d+$/.test(tokens[0]!)) return labels;
+  if (/^[nsew]$/i.test(rest)) {
+    notes.push("house_number:directional");
+    labels[1] = "StreetNamePreDirectional";
+  } else if (/^(\p{L}\d?|\d \/ \d|\d\/\d|[¼½¾])$/u.test(rest)) {
+    labels.fill("AddressNumberSuffix", 1);
   }
   return labels;
 }
@@ -429,7 +545,13 @@ export function refine(lpTokens: readonly LpToken[], options: RefineOptions): Re
     let labels: Label[];
     const simple = SIMPLE[tok.label];
     if (simple) {
+      if (tok.label === "city" && VENUE_CITY.test(texts.map(norm).filter(Boolean).join(" "))) {
+        return { ok: false, reason: "venue-as-city", notes };
+      }
       labels = texts.map(() => simple);
+      noteSimpleField(tok.label, texts, notes);
+    } else if (tok.label === "house_number") {
+      labels = refineHouseNumber(texts, notes);
       noteSimpleField(tok.label, texts, notes);
     } else if (tok.label === "road") {
       if (PLACEHOLDER_ROAD.test(texts.map(norm).filter(Boolean).join(" "))) {
@@ -467,7 +589,13 @@ function render(items: readonly Item[], options: RefineOptions, notes: string[])
     // the same rule spansFromTokens applies, so a field boundary with no separator (e.g.
     // category "cafes" then near "in") is invisible in the spans too.
     const merge = text.length > 0 && pending === undefined;
-    if (pending === "FSEP") text += options.fieldSeparator;
+    const last = spans.at(-1);
+    if (pending === "FSEP" && last?.label === item.label && /^\s*$/.test(options.fieldSeparator)) {
+      // Two fields whose same-label tokens would touch with only a space between ("4th Fl
+      // Apt 3"): a comma keeps them two spans that a tokenizer can tell apart.
+      text += ", ";
+      notes.push("render:comma-between-fields");
+    } else if (pending === "FSEP") text += options.fieldSeparator;
     else if (pending === "-") text += " - ";
     else if (pending !== undefined) text += `${pending} `;
     else if (text) text += " ";
@@ -475,7 +603,6 @@ function render(items: readonly Item[], options: RefineOptions, notes: string[])
 
     const start = text.length;
     text += item.text;
-    const last = spans.at(-1);
     if (merge && last?.label === item.label) last.end = text.length;
     else spans.push({ start, end: text.length, label: item.label });
   }
