@@ -31,8 +31,22 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # data/ depends only on the code and inputs that build it, so a hit skips `pnpm data`.
+      - id: data-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: data-${{ hashFiles('src/data/**', 'datasets/**', 'overrides/**') }}
       # Streams libpostal's training data from archive.org and builds data/.
-      - run: pnpm data
+      - if: steps.data-cache.outputs.cache-hit != 'true'
+        run: pnpm data
+      # models/ files are named by impl source hash and training-data hash, so a model restored
+      # from an older cache is reused only when it is still the right one.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: models
+          key: models-${{ hashFiles('impls/**', 'src/**', 'datasets/**', 'overrides/**', 'eval.config.ts') }}
+          restore-keys: models-
       # Trains the in-page models for the full suite (a few minutes), then writes docs/dist/.
       # Reference parsers' demo columns need results/predictions/, which is gitignored, so the
       # page built here has none. `run` is needed: bare `pnpm docs` is pnpm's own command.

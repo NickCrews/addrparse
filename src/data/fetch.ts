@@ -36,6 +36,8 @@ for (const s of only ?? []) if (!isSource(s)) throw new Error(`unknown source ${
 
 mkdirSync(RAW_DIR, { recursive: true });
 
+let totalBytes = 0;
+const t0 = performance.now();
 for (const source of (only as LibpostalSource[] | undefined) ??
   (Object.keys(LIBPOSTAL_FILES) as LibpostalSource[])) {
   const limit = limits[source];
@@ -45,10 +47,13 @@ for (const source of (only as LibpostalSource[] | undefined) ??
     console.log(`${source}: already have ${limit}+ lines in ${path}`);
     continue;
   }
-  await fetchSource(source, path, limit);
+  totalBytes += await fetchSource(source, path, limit);
 }
+console.log(`downloaded ${mb(totalBytes)} in ${secs(performance.now() - t0)}`);
 
-async function fetchSource(source: LibpostalSource, path: string, limit: number): Promise<void> {
+/** Streams one source into `path` and returns the compressed bytes downloaded. */
+async function fetchSource(source: LibpostalSource, path: string, limit: number): Promise<number> {
+  const t0 = performance.now();
   const url = libpostalUrl(source);
   console.log(`${source}: streaming ${url}`);
   const abort = new AbortController();
@@ -60,6 +65,8 @@ async function fetchSource(source: LibpostalSource, path: string, limit: number)
   // Stopping early aborts the download; the resulting stream errors are expected.
   const ignore = () => {};
   body.on("error", ignore);
+  let bytes = 0;
+  body.on("data", (chunk: Buffer) => (bytes += chunk.length));
   gunzip.on("error", ignore);
   body.pipe(gunzip);
   const out = createWriteStream(path);
@@ -79,7 +86,18 @@ async function fetchSource(source: LibpostalSource, path: string, limit: number)
     gunzip.destroy();
     await new Promise((resolve) => out.end(resolve));
   }
+  const ms = performance.now() - t0;
   console.log(`${source}: kept ${kept} US lines of ${seen} read → ${path}`);
+  console.log(`${source}: downloaded ${mb(bytes)} in ${secs(ms)} (${mb(bytes / (ms / 1000))}/s)`);
+  return bytes;
+}
+
+function mb(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function secs(ms: number): string {
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function countLines(path: string): number {
