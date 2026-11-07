@@ -93,14 +93,15 @@ if (!sources.some((s) => weights[s] > 0 && limits[s] > 0)) {
 const lines = sources.map((s) =>
   readFileSync(rawPath(s), "utf8").split("\n").filter(Boolean).slice(0, limits[s]),
 );
-const order = mixOrder(
-  lines.map((l) => l.length),
-  sources.map((s) => weights[s]),
-);
+
+const lengths = lines.map((l) => l.length);
+const mixWeights = sources.map((s) => weights[s]);
 
 /** Every raw line with its source and line number, in the weighted mix order. */
 function* rawLines(): Generator<{ line: string; source: LibpostalSource; i: number }> {
-  for (const { source: s, i } of order) yield { line: lines[s]![i]!, source: sources[s]!, i };
+  for (const { source: s, i } of mixOrder(lengths, mixWeights)) {
+    yield { line: lines[s]![i]!, source: sources[s]!, i };
+  }
 }
 
 const overrides = loadOverrides();
