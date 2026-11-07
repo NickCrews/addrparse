@@ -40,9 +40,21 @@ export const DIRECTIONALS: ReadonlySet<string> = new Set([
  * libpostal's nonstandard directional spellings ("So", "Sth", "Wst", "Nrth") and compounds of
  * them ("Sowst", "Northwst"), minus English words the compounding produces.
  */
-const NORTH_SOUTH: ReadonlySet<string> = new Set(
-  ["n", "no", "nth", "nrth", "nrt", "nort", "norh", "north", "s", "so", "sth", "sou", "south"],
-);
+const NORTH_SOUTH: ReadonlySet<string> = new Set([
+  "n",
+  "no",
+  "nth",
+  "nrth",
+  "nrt",
+  "nort",
+  "norh",
+  "north",
+  "s",
+  "so",
+  "sth",
+  "sou",
+  "south",
+]);
 const EAST_WEST: ReadonlySet<string> = new Set(["e", "east", "w", "wst", "west"]);
 export const ABBREVIATED_DIRECTIONALS: ReadonlySet<string> = (() => {
   const out = new Set([...NORTH_SOUTH, ...EAST_WEST]);
@@ -253,7 +265,9 @@ export function refineRoad(tokens: readonly string[], notes: string[]): Label[] 
   if (tokens.some((tok) => /[()]/.test(tok))) notes.push("road:parenthetical");
 
   const noteDirectional = (labels: readonly Label[]) => {
-    const abbrev = labels.some((l, k) => l.endsWith("Directional") && directional(t[k]!) === "abbrev");
+    const abbrev = labels.some(
+      (l, k) => l.endsWith("Directional") && directional(t[k]!) === "abbrev",
+    );
     if (abbrev) notes.push("road:abbreviated-directional");
   };
 
@@ -378,7 +392,8 @@ function noteSimpleField(field: string, texts: readonly string[], notes: string[
     const joined = words.join(" ").replace(/\./g, " ").replace(/\s+/g, " ").trim();
     const known =
       field === "state"
-        ? STATE_NAMES.has(joined.replace(/ state$/, "")) || STATE_CODES.has(joined.replace(/ /g, ""))
+        ? STATE_NAMES.has(joined.replace(/ state$/, "")) ||
+          STATE_CODES.has(joined.replace(/ /g, ""))
         : COUNTRY_NAMES.has(joined);
     // libpostal's translations: "Kalifornien", "Nueva York", "Estados Unidos"
     if (!known) notes.push(`${field}:non-english`);

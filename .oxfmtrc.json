@@ -3,5 +3,5 @@
   "printWidth": 100,
   "useTabs": false,
   "tabWidth": 2,
-  "ignorePatterns": ["pnpm-lock.yaml", "data/", "models/", "results/"]
+  "ignorePatterns": ["pnpm-lock.yaml", "/data/", "/models/", "/results/"]
 }

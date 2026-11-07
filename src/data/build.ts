@@ -12,10 +12,22 @@
  *   node src/data/build.ts
  */
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, type WriteStream, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  type WriteStream,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import type { Label } from "../labels.ts";
 import type { Example } from "../types.ts";
-import { LIBPOSTAL_FILES, LIBPOSTAL_SNAPSHOT, parseLine, type LibpostalSource } from "./libpostal.ts";
+import {
+  LIBPOSTAL_FILES,
+  LIBPOSTAL_SNAPSHOT,
+  parseLine,
+  type LibpostalSource,
+} from "./libpostal.ts";
 import { DATA_DIR, DATA_STATS_PATH, rawPath, splitPath, type Split } from "./paths.ts";
 import { refine } from "./refine.ts";
 
@@ -48,9 +60,10 @@ if (sources.length === 0) throw new Error("no data/raw/*.tsv; run `pnpm data:fet
 const lines = sources.map((s) => readFileSync(rawPath(s), "utf8").split("\n").filter(Boolean));
 
 mkdirSync(DATA_DIR, { recursive: true });
-const outs = Object.fromEntries(
-  SPLITS.map((s) => [s, createWriteStream(splitPath(s))]),
-) as Record<Split, WriteStream>;
+const outs = Object.fromEntries(SPLITS.map((s) => [s, createWriteStream(splitPath(s))])) as Record<
+  Split,
+  WriteStream
+>;
 
 const stats = {
   libpostalSnapshot: LIBPOSTAL_SNAPSHOT,
