@@ -68,16 +68,38 @@ describe("transforms", () => {
       [
         ["9", "AddressNumber"],
         ["Elm", "StreetName"],
-        ["#", "OccupancyType"],
+        ["Apt", "OccupancyType"],
         ["4", "OccupancyIdentifier"],
       ],
       [" ", " ", " "],
     );
     const out = noised(ex, "unit-joined");
-    assert.equal(out.text, "9 Elm #4");
+    assert.equal(out.text, "9 Elm Apt4");
     assert.deepEqual(fields(out).slice(2), [
-      ["#", "OccupancyType"],
+      ["Apt", "OccupancyType"],
       ["4", "OccupancyIdentifier"],
+    ]);
+  });
+
+  it("unit-joined makes a joined # part of the identifier", () => {
+    const unit = (type: string) =>
+      build(
+        [
+          ["9", "AddressNumber"],
+          ["Elm", "StreetName"],
+          [type, "OccupancyType"],
+          ["1", "OccupancyIdentifier"],
+        ],
+        [" ", ", ", " "],
+      );
+    const alone = noised(unit("#"), "unit-joined");
+    assert.equal(alone.text, "9 Elm, #1");
+    assert.deepEqual(fields(alone).slice(2), [["#1", "OccupancyIdentifier"]]);
+    const floor = noised(unit("Floor #"), "unit-joined");
+    assert.equal(floor.text, "9 Elm, Floor #1");
+    assert.deepEqual(fields(floor).slice(2), [
+      ["Floor", "OccupancyType"],
+      ["#1", "OccupancyIdentifier"],
     ]);
   });
 
@@ -317,10 +339,21 @@ describe("noise property", () => {
               ex.spans.map((s) => s.label),
             );
             break;
-          case "unit-joined":
-            assert.deepEqual(after, before);
+          case "unit-joined": {
+            // Only occupancy spans change, and only by whitespace or by "#" moving from the
+            // type to the identifier.
+            const rest = (b: string[]) => b.filter((k) => !k.startsWith("Occupancy"));
+            assert.deepEqual(rest(after), rest(before));
+            const occupancy = (e: { text: string; spans: Span[] }) =>
+              fields(e)
+                .filter(([, l]) => l!.startsWith("Occupancy"))
+                .map(([t]) => t)
+                .join("")
+                .replace(/\s/g, "");
+            assert.equal(occupancy(out), occupancy(ex));
             assert.equal(out.text.replace(/\s/g, ""), ex.text.replace(/\s/g, ""));
             break;
+          }
           case "drop-zip":
           case "drop-state": {
             const label = name === "drop-zip" ? "ZipCode" : "StateName";
