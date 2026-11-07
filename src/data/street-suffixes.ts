@@ -1,5 +1,6 @@
 // Street suffix spellings (USPS Publication 28 Appendix C1 plus common variants), lowercase.
-// Copied from the STREET_NAMES set in datamade/usaddress (MIT).
+// Copied from the STREET_NAMES set in datamade/usaddress, MIT License, Copyright (c) 2014 The
+// Atlanta Journal Constitution; full notice in LICENSE.
 export const STREET_SUFFIXES: ReadonlySet<string> = new Set([
   "allee",
   "alley",
