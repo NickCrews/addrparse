@@ -136,25 +136,25 @@ function home(ctx: PageContext): string {
 <p>is parsed to a sequence of tokens:</p>
 <p class="parsed">${spansHtml(ex.text, ex.spans)}</p>
 ${table(
-    ["label", "text", "start", "end"],
-    ex.spans.map((s) => [
-      `<mark class="lab" data-label="${s.label}">${s.label}</mark>`,
-      esc(ex.text.slice(s.start, s.end)),
-      String(s.start),
-      String(s.end),
-    ]),
-    { align: ["l", "l", "r", "r"] },
-  )}
+  ["label", "text", "start", "end"],
+  ex.spans.map((s) => [
+    `<mark class="lab" data-label="${s.label}">${s.label}</mark>`,
+    esc(ex.text.slice(s.start, s.end)),
+    String(s.start),
+    String(s.end),
+  ]),
+  { align: ["l", "l", "r", "r"] },
+)}
 
 <h2 id="home-goals">What</h2>
 ${list([
-    "99.87% per-token accuracy, 97.50% exact match.",
-    "Run anywhere: Zero dependencies, pure typescript, 335.kb gzipped model size.",
-    "Performant: ~100k/sec per thread, 21us p99 latency, peak memory of 17Mb (all on M1 Mac).",
-    "Say how sure each parse is, so a caller can accept confident parses and review the rest.",
-    "Recognize text that is not an address and label it <code>NotAddress</code> instead of forcing a parse.",
-    "Every claim backed by a saved, reproducible measurement (the Metrics tab).",
-  ])}
+  "99.87% per-token accuracy, 97.50% exact match.",
+  "Run anywhere: Zero dependencies, pure typescript, 335.kb gzipped model size.",
+  "Performant: ~100k/sec per thread, 21us p99 latency, peak memory of 17Mb (all on M1 Mac).",
+  "Say how sure each parse is, so a caller can accept confident parses and review the rest.",
+  "Recognize text that is not an address and label it <code>NotAddress</code> instead of forcing a parse.",
+  "Every claim backed by a saved, reproducible measurement (the Metrics tab).",
+])}
 
 <h2 id="home-labels">Labels</h2>
 <p>Names follow <a href="https://github.com/datamade/usaddress">usaddress</a>, which follows the
@@ -171,17 +171,17 @@ const { spans, confidence } = parser.parse("12 N Main St Apt 4, Springfield, IL 
 // spans: [{ start: 0, end: 2, label: "AddressNumber" }, …]
 // confidence: probability that the whole labeling is right, in [0, 1]</code></pre>
 ${list([
-    "Spans are character ranges <code>[start, end)</code> of the input, sorted and non-overlapping. Text outside every span (spaces, commas) has no label.",
-    "Parsing has no side effects and needs no network or file access; load the model once and reuse the parser.",
-    "To abstain, treat a parse as unusable when its confidence is below a threshold, or when every span is <code>NotAddress</code>. The Metrics tab shows what each threshold costs.",
-  ])}
+  "Spans are character ranges <code>[start, end)</code> of the input, sorted and non-overlapping. Text outside every span (spaces, commas) has no label.",
+  "Parsing has no side effects and needs no network or file access; load the model once and reuse the parser.",
+  "To abstain, treat a parse as unusable when its confidence is below a threshold, or when every span is <code>NotAddress</code>. The Metrics tab shows what each threshold costs.",
+])}
 
 <h2 id="home-status">Status</h2>
 ${list([
-    "Not published to npm. Use it from a clone of the repository.",
-    "Trained models aren't distributed separately; this page embeds them for the playground.",
-    "US addresses only.",
-  ])}
+  "Not published to npm. Use it from a clone of the repository.",
+  "Trained models aren't distributed separately; this page embeds them for the playground.",
+  "US addresses only.",
+])}
 </section>`;
 }
 
@@ -301,24 +301,24 @@ function trainingData(s: DataStats, suite: string): string {
 the US, relabeled into the label set above, deduplicated and split by a hash of the line. Sources are
 interleaved by weight, so every prefix of a split has the same mix.</p>
 ${table(
-    ["source", "weight", "lines read", "rejected", "duplicates", "examples", "share"],
-    sourceRows,
-    { align: ["l", "r", "r", "r", "r", "r", "r"] },
-  )}
+  ["source", "weight", "lines read", "rejected", "duplicates", "examples", "share"],
+  sourceRows,
+  { align: ["l", "r", "r", "r", "r", "r", "r"] },
+)}
 ${list([
-    `${code("openaddresses")}: government address points (number, street, city, state, ZIP).`,
-    `${code("osm")}: OpenStreetMap addresses, often with units, PO boxes and countries.`,
-    `${code("ways")}: OpenStreetMap streets with a place, no house number.`,
-    `${code("places")}: OpenStreetMap places alone (city, state, ZIP).`,
-    `${code("junk")}: synthetic text that is not an address (placeholders, emails, phone numbers, names, ordinary words), all NotAddress; made after ${pct(s.notAddress.junkRate, 0)} of address examples.`,
-    `${code("embedded")}: a real address inside other text ("Mail to … thanks"); made from ${pct(s.notAddress.embeddedRate, 0)} of address examples.`,
-  ])}
+  `${code("openaddresses")}: government address points (number, street, city, state, ZIP).`,
+  `${code("osm")}: OpenStreetMap addresses, often with units, PO boxes and countries.`,
+  `${code("ways")}: OpenStreetMap streets with a place, no house number.`,
+  `${code("places")}: OpenStreetMap places alone (city, state, ZIP).`,
+  `${code("junk")}: synthetic text that is not an address (placeholders, emails, phone numbers, names, ordinary words), all NotAddress; made after ${pct(s.notAddress.junkRate, 0)} of address examples.`,
+  `${code("embedded")}: a real address inside other text ("Mail to … thanks"); made from ${pct(s.notAddress.embeddedRate, 0)} of address examples.`,
+])}
 <h3>Splits</h3>
 ${table(
-    ["split", "examples", "share"],
-    Object.entries(s.bySplit).map(([k, n]) => [code(k), int(n), pct(n / s.examples)]),
-    { align: ["l", "r", "r"] },
-  )}
+  ["split", "examples", "share"],
+  Object.entries(s.bySplit).map(([k, n]) => [code(k), int(n), pct(n / s.examples)]),
+  { align: ["l", "r", "r"] },
+)}
 <p>Hill-climbing uses dev only. Test is scored rarely so it stays an unbiased estimate. The ${code(suite)} suite trains on the first examples of train and scores the first examples of dev.</p>
 <h3>Formatting noise</h3>
 <p>After splitting, seeded transforms rewrite some examples (text and labels together), so robustness to
@@ -333,13 +333,13 @@ ${table(["reason", "lines"], rejectedRows, { align: ["l", "r"] })}`;
 function goldSection(s: DataStats | undefined): string {
   const notes = s
     ? Object.entries(s.notes)
-      .filter(([n]) => !n.startsWith("dropped:"))
-      .sort((a, b) => b[1] - a[1])
+        .filter(([n]) => !n.startsWith("dropped:"))
+        .sort((a, b) => b[1] - a[1])
     : [];
   const dropped = s
     ? Object.entries(s.notes)
-      .filter(([n]) => n.startsWith("dropped:"))
-      .sort((a, b) => b[1] - a[1])
+        .filter(([n]) => n.startsWith("dropped:"))
+        .sort((a, b) => b[1] - a[1])
     : [];
   return `
 <p>libpostal labels a whole street as one field (<code>road</code>) and a unit as another. The gold
@@ -349,14 +349,15 @@ position), then check the result against counts over the whole corpus. Fields ou
 ${s ? `(${int(s.overrides.examples)} examples)` : ""}.</p>
 <p>Known limitations:</p>
 ${list([
-    "Every rule that makes a judgment call records a note on the example. The <code>gold=heuristic</code> slice (Models tab) is the examples with such a note; parsers score lower there partly because the gold is less certain.",
-    "libpostal adds deliberate noise to its data: abbreviations, truncations and misspellings (Wst, Roa, Aprt). Some are recognized and labeled; some leave a wrong gold label.",
-    "Conventions follow libpostal's data, not usaddress's hand labels; usaddress loses points here for labeling some things differently, not only for mistakes.",
-    "libpostal was trained on these same lines, dev and test included.",
-    "Gold for the playground's demo rows has the same noise: a model marked wrong may be right.",
-  ])}
-${s
-      ? `<details><summary>Heuristic notes (examples)</summary>${table(
+  "Every rule that makes a judgment call records a note on the example. The <code>gold=heuristic</code> slice (Models tab) is the examples with such a note; parsers score lower there partly because the gold is less certain.",
+  "libpostal adds deliberate noise to its data: abbreviations, truncations and misspellings (Wst, Roa, Aprt). Some are recognized and labeled; some leave a wrong gold label.",
+  "Conventions follow libpostal's data, not usaddress's hand labels; usaddress loses points here for labeling some things differently, not only for mistakes.",
+  "libpostal was trained on these same lines, dev and test included.",
+  "Gold for the playground's demo rows has the same noise: a model marked wrong may be right.",
+])}
+${
+  s
+    ? `<details><summary>Heuristic notes (examples)</summary>${table(
         ["note", "examples"],
         notes.map(([n, c]) => [code(n), int(c)]),
         { align: ["l", "r"] },
@@ -366,8 +367,8 @@ ${s
         dropped.map(([n, c]) => [code(n.slice("dropped:".length)), int(c)]),
         { align: ["l", "r"] },
       )}</details>`
-      : ""
-    }`;
+    : ""
+}`;
 }
 
 function machines(ctx: PageContext): string {
@@ -408,9 +409,9 @@ version and machine. The numbers are in the comparison table on the Models tab.<
 
 <h2 id="metrics-what">What is measured, and why</h2>
 ${METRIC_GROUPS.map(
-    (g) =>
-      `<h3>${esc(g.title)}</h3><p>${esc(g.why)}</p><p class="metric-names">${g.metrics.map(code).join(" ")}</p>`,
-  ).join("\n")}
+  (g) =>
+    `<h3>${esc(g.title)}</h3><p>${esc(g.why)}</p><p class="metric-names">${g.metrics.map(code).join(" ")}</p>`,
+).join("\n")}
 <p>Suite ${code(ctx.suite)}: trained on ${int(ctx.trainExamples)} examples, scored on
 ${int(ctx.evalExamples)} dev examples, seed ${ctx.seed}. Speed and memory are measured only for the
 TypeScript parsers; the references run as Python subprocesses, whose timings aren't comparable.</p>
@@ -423,13 +424,13 @@ ${goldSection(s)}
 
 <h2 id="metrics-non-goals">Non-goals</h2>
 ${list([
-    "Addresses outside the US.",
-    "Validation: whether an address exists or receives mail.",
-    "Geocoding: coordinates for an address.",
-    "Standardization: rewriting Street as ST or filling in a missing ZIP. Spans point into the input text unchanged.",
-    "Names of people or businesses; they are NotAddress or left unlabeled.",
-    "Intersections and landmarks as their own labels.",
-  ])}
+  "Addresses outside the US.",
+  "Validation: whether an address exists or receives mail.",
+  "Geocoding: coordinates for an address.",
+  "Standardization: rewriting Street as ST or filling in a missing ZIP. Spans point into the input text unchanged.",
+  "Names of people or businesses; they are NotAddress or left unlabeled.",
+  "Intersections and landmarks as their own labels.",
+])}
 
 <h2 id="metrics-machines">Machines</h2>
 <p>Timings are from these machines. Runs on different machines aren't directly comparable.</p>
@@ -440,12 +441,12 @@ ${machines(ctx)}
 playground, are made from data under the Open Database License and other terms:</p>
 <blockquote class="attribution">${linkify(ctx.attribution)}</blockquote>
 ${list([
-    `Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>.`,
-    `Address data from <a href="https://openaddresses.io">OpenAddresses</a> and its government sources, under each source's terms.`,
-    `Via <a href="https://github.com/openvenues/libpostal">libpostal</a>'s parser training data, snapshot ${code(s?.libpostalSnapshot ?? "unknown")}.`,
-    `The method of making the training data is <a href="https://github.com/NickCrews/addrparse/tree/main/src/data">src/data/</a> in the repository.`,
-    "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
-  ])}
+  `Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>.`,
+  `Address data from <a href="https://openaddresses.io">OpenAddresses</a> and its government sources, under each source's terms.`,
+  `Via <a href="https://github.com/openvenues/libpostal">libpostal</a>'s parser training data, snapshot ${code(s?.libpostalSnapshot ?? "unknown")}.`,
+  `The method of making the training data is <a href="https://github.com/NickCrews/addrparse/tree/main/src/data">src/data/</a> in the repository.`,
+  "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
+])}
 <p>This is a reading of the licenses, not legal advice; see the repository README.</p>
 </section>`;
 }
@@ -518,11 +519,12 @@ ${table(["label", ...names], perLabel, { align: ["l", ...runs.map(() => "r" as c
 <details><summary>Exact match per slice</summary>
 <p>Slices are subsets of the dev eval set (<code>src/eval/slices.ts</code>): by source, by which labels the gold has, by formatting noise, by whether the gold rests on a heuristic.</p>
 ${table(["slice", "examples", ...names], slices, { align: ["l", "r", ...runs.map(() => "r" as const)] })}</details>
-${curve.length
-      ? `<details><summary>Exact match by training-set size</summary>
+${
+  curve.length
+    ? `<details><summary>Exact match by training-set size</summary>
 ${table(["train examples", ...curved.map((r) => esc(r.impl))], curve, { align: ["l", ...curved.map(() => "r" as const)] })}</details>`
-      : ""
-    }`;
+    : ""
+}`;
 }
 
 function runCaption(ctx: PageContext): string {
@@ -553,10 +555,11 @@ function modelCard(ctx: PageContext, impl: string): string {
 <article class="model" id="models-${impl}">
 <h3>${esc(impl)}${r && isReference(r) ? ' <span class="tag">reference, Python</span>' : ""}${size ? ' <span class="tag">runs in this page</span>' : ""}</h3>
 ${n ? `<p><strong>${esc(n.summary)}</strong></p><p>${esc(n.architecture)}</p>` : ""}
-${keys.length
-      ? `<dl class="kv">${keys.map((m) => `<div><dt>${esc(m.name)}</dt><dd>${esc(fmt(m, r))}</dd></div>`).join("")}</dl>`
-      : ""
-    }
+${
+  keys.length
+    ? `<dl class="kv">${keys.map((m) => `<div><dt>${esc(m.name)}</dt><dd>${esc(fmt(m, r))}</dd></div>`).join("")}</dl>`
+    : ""
+}
 ${n ? `<div class="procon"><div><h4>Pros</h4>${list(n.pros.map(esc))}</div><div><h4>Cons</h4>${list(n.cons.map(esc))}</div></div><p><strong>Use it for:</strong> ${esc(n.use)}</p>` : ""}
 ${size ? `<p class="dim">Embedded model: ${kb(size.bytes)} (${kb(size.gzipBytes)} gzip).</p>` : ""}
 </article>`;
