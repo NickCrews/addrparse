@@ -20,6 +20,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+The files in test/fixtures/data/ are a database derived from OpenStreetMap and
+OpenAddresses, not part of the Software; they are licensed under the Open
+Database License 1.0, as stated in test/fixtures/data/LICENSE.
+
 --------------------------------------------------------------------------------
 
 src/data/street-suffixes.ts is copied from the STREET_NAMES set in

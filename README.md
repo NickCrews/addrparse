@@ -188,7 +188,9 @@ errors, or trains a different model twice from the same data.
 
 The code is MIT-licensed (`LICENSE`). `src/data/street-suffixes.ts` is copied from
 [datamade/usaddress](https://github.com/datamade/usaddress) (MIT, © 2014 The Atlanta Journal
-Constitution); `LICENSE` carries its notice.
+Constitution); `LICENSE` carries its notice. The CI fixture `test/fixtures/data/` is data, not
+code: it is under ODbL 1.0, with attribution and the method of making it in
+`test/fixtures/data/LICENSE`.
 
 The training data is libpostal's parser training data (2017-03-04 snapshot), which
 [libpostal's README](https://github.com/openvenues/libpostal) lists as:
@@ -196,6 +198,8 @@ The training data is libpostal's parser training data (2017-03-04 snapshot), whi
 | file (`src/data/libpostal.ts`)                    | from          | license                                                    |
 | ------------------------------------------------- | ------------- | ---------------------------------------------------------- |
 | `formatted_addresses_tagged.random.tsv.gz`        | OpenStreetMap | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) |
+| `formatted_ways_tagged.random.tsv.gz`             | OpenStreetMap | ODbL 1.0                                                   |
+| `formatted_places_tagged.random.tsv.gz`           | OpenStreetMap | ODbL 1.0                                                   |
 | `openaddresses_formatted_addresses_tagged…tsv.gz` | OpenAddresses | per source, "various licenses, mostly CC-BY"               |
 
 OpenAddresses records each source's terms in its JSON file as a `license` object (`text`, `url`,
@@ -218,11 +222,17 @@ data rebuilt from current OpenAddresses needs this check redone.
 
 ### What counts as what
 
-- **The examples are a Derivative Database** of OSM (ODbL §1, §4.4). `data/`, and any committed
-  sample of it, may be used within an organisation (§4.5(c)); publishing them requires ODbL plus
-  the OpenAddresses sources' terms. The OSMF counts fewer than 100 features as insubstantial only
-  for a one-off, non-systematic extract
-  ([Substantial guideline](https://osmfoundation.org/wiki/Licence/Community_Guidelines/Substantial_-_Guideline)).
+- **The examples are a Derivative Database** of OSM (ODbL §1, §4.4); publishing them requires
+  ODbL plus the OpenAddresses sources' terms. In this repo:
+  - `data/` is gitignored.
+  - `test/fixtures/data/` (600 examples) is a substantial extract, published under ODbL 1.0 with
+    attribution and the method of making it (`test/fixtures/data/LICENSE`).
+  - `overrides/gold.jsonl` and the tests quote a few dozen hand-picked lines. The OSMF counts
+    fewer than 100 features as insubstantial only for a one-off, non-systematic extract
+    ([Substantial guideline](https://osmfoundation.org/wiki/Licence/Community_Guidelines/Substantial_-_Guideline));
+    hand-picked lines are such an extract.
+  - Run files in `results/runs/` hold aggregate metrics only; per-example predictions
+    (`results/predictions/`) and trained models (`models/`) are gitignored.
 - **A trained model needs attribution in its documentation.** The OSMF's
   [attribution guideline](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines#Machine_learning_models)
   (adopted 2021-06-25) treats training sets that are substantial OSM extracts as Derivative

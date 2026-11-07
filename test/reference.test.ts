@@ -201,7 +201,7 @@ describe("collectPredictions", () => {
       usaddressSpans,
     );
     assert.equal(p.parseErrors, 1);
-    assert.match(p.firstError!, /"bad".*boom/);
+    assert.match(p.firstError!, /^text 1: .*boom/);
     assert.deepEqual(p.spans, [
       [{ start: 0, end: 5, label: "PlaceName" }],
       [],

@@ -1,0 +1,38 @@
+The files in this directory (train.jsonl, dev.jsonl, test.jsonl) are a database, not part of
+the MIT-licensed software in this repository.
+
+Contents
+--------
+600 labeled US address examples: the first 400 train, 100 dev and 100 test examples of a build of
+this repository's data pipeline. Each example records its upstream source in its `source` field:
+
+- osm, ways, places: OpenStreetMap data, © OpenStreetMap contributors.
+- openaddresses: OpenAddresses data (https://openaddresses.io) from the government sources listed
+  at https://github.com/openaddresses/openaddresses/tree/06015e09e15bbcfdaac7d10883665db66c4d1f1c/sources/us,
+  including Oregon Metro (ODbL 1.0).
+- embedded: one of the above wrapped in synthetic text.
+- junk: synthetic text only (src/data/not-address.ts).
+
+All upstream lines come from libpostal's parser training data, snapshot 20170304
+(https://github.com/openvenues/libpostal; files listed in src/data/libpostal.ts).
+
+License
+-------
+This directory is a Derivative Database of OpenStreetMap and is made available under the Open
+Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/
+OpenStreetMap copyright and license: https://www.openstreetmap.org/copyright
+
+Examples from OpenAddresses also remain subject to the terms of their government sources, as
+recorded in the source files at the link above.
+
+Method of making it (ODbL 4.6)
+------------------------------
+From a checkout of https://github.com/NickCrews/addrparse at the commit that last changed these
+files:
+
+    pnpm install
+    pnpm data:fetch            # src/data/fetch.ts: downloads the libpostal snapshot's US lines
+    pnpm data:build            # src/data/build.ts: refines labels and splits into data/
+    node src/data/fixture.ts   # copies the first examples of each split here
+
+Every step is deterministic, so this reproduces the files byte for byte.

@@ -1,6 +1,7 @@
 {
   "name": "addrparse",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "data": "node src/data/fetch.ts && node src/data/build.ts",
