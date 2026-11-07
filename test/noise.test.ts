@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
   addNoise,
@@ -11,7 +12,7 @@ import {
   toPieces,
   type NoiseName,
 } from "../src/data/noise.ts";
-import { splitPath } from "../src/data/paths.ts";
+import { ROOT, splitPath } from "../src/data/paths.ts";
 import type { Label } from "../src/labels.ts";
 import type { Example, Span } from "../src/types.ts";
 
@@ -259,10 +260,15 @@ const bag = (ex: { text: string; spans: Span[] }, f = (s: string) => s) =>
     .map(([t, l]) => `${l}\t${f(t!)}`)
     .sort();
 
-/** Clean examples from the built dev split, when it exists, so real shapes are covered too. */
+/**
+ * Clean examples from the built dev split, or from the committed fixture when there is no built
+ * data (CI), so real shapes are covered too.
+ */
 function devExamples(n: number): Example[] {
-  if (!existsSync(splitPath("dev"))) return [];
-  const lines = readFileSync(splitPath("dev"), "utf8").split("\n", n * 2);
+  const path = existsSync(splitPath("dev"))
+    ? splitPath("dev")
+    : join(ROOT, "test/fixtures/data/dev.jsonl");
+  const lines = readFileSync(path, "utf8").split("\n", n * 2);
   return lines
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Example)
@@ -272,10 +278,8 @@ function devExamples(n: number): Example[] {
 
 describe("noise property", () => {
   const rng = seededRng("property");
-  const examples = [
-    ...Array.from({ length: 3000 }, (_, n) => randomExample(rng, n)),
-    ...devExamples(3000),
-  ];
+  const real = devExamples(3000);
+  const examples = [...Array.from({ length: 3000 }, (_, n) => randomExample(rng, n)), ...real];
 
   for (const name of NOISE_NAMES) {
     it(`${name} keeps every span on exactly its text`, () => {
@@ -378,9 +382,9 @@ describe("noise property", () => {
     }
   });
 
-  it("addNoise at default rates leaves most examples clean", () => {
-    const clean = examples.filter((ex) => !addNoise(ex, seededRng(ex.id), NOISE_RATES).noise);
-    assert.ok(clean.length / examples.length > 0.7);
+  it("addNoise at default rates leaves most real examples clean", () => {
+    const clean = real.filter((ex) => !addNoise(ex, seededRng(ex.id), NOISE_RATES).noise);
+    assert.ok(clean.length / real.length > 0.7);
   });
 
   it("is deterministic for a given seed", () => {
