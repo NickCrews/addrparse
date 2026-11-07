@@ -60,23 +60,23 @@ returns nothing: its timings and memory are the harness's own floor.
 Every measurement runs in a fresh `node --expose-gc` process (`src/eval/child.ts`), so JIT state
 and heap from one measurement don't affect another.
 
-| metric                    | how it's measured                                                                                   |
-| ------------------------- | --------------------------------------------------------------------------------------------------- |
-| exact match               | share of eval examples whose predicted span set equals gold. The headline number.                   |
-| token accuracy            | share of whitespace tokens whose label matches gold                                                 |
-| span P/R/F1               | a span counts only if start, end and label all match; also per label                                |
-| slices                    | exact match on subsets (`src/eval/slices.ts`), e.g. PO boxes, all-caps, OSM                         |
-| latency p50/p99, µs/token | one thread, after warmup passes; each `parse` call timed individually                               |
-| throughput/s              | N worker threads, each with its own model, parsing back to back for a fixed time; median of repeats |
-| model size, gzip          | bytes returned by `train`, raw and gzip -9                                                          |
-| model load ms             | wall time of `load(bytes)`                                                                          |
-| model heap                | heap used after `load`, minus before (both after GC)                                                |
-| infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                            |
-| train seconds, examples/s | wall time of `train()`, excluding data loading                                                      |
-| train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                         |
-| determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                       |
-| learning curve            | exact match after training on fewer examples (`full` suite)                                         |
-| code lines                | lines of `impls/<name>/**/*.ts`                                                                     |
+| metric                    | how it's measured                                                                                        |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| exact match               | share of eval examples whose predicted span set equals gold. The headline number.                        |
+| token accuracy            | share of whitespace tokens whose label matches gold                                                      |
+| span P/R/F1               | a span counts only if start, end and label all match; also per label                                     |
+| slices                    | exact match on subsets (`src/eval/slices.ts`), e.g. PO boxes, all-caps, `noise=none`, one per noise type |
+| latency p50/p99, µs/token | one thread, after warmup passes; each `parse` call timed individually                                    |
+| throughput/s              | N worker threads, each with its own model, parsing back to back for a fixed time; median of repeats      |
+| model size, gzip          | bytes returned by `train`, raw and gzip -9                                                               |
+| model load ms             | wall time of `load(bytes)`                                                                               |
+| model heap                | heap used after `load`, minus before (both after GC)                                                     |
+| infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                                 |
+| train seconds, examples/s | wall time of `train()`, excluding data loading                                                           |
+| train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                              |
+| determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                            |
+| learning curve            | exact match after training on fewer examples (`full` suite)                                              |
+| code lines                | lines of `impls/<name>/**/*.ts`                                                                          |
 
 Memory caveats: the "over baseline" peaks are sampled every millisecond by a worker thread, so
 spikes shorter than that can be missed. The run JSON also has `peakRssMB`, the OS's maxRSS; that
@@ -98,15 +98,16 @@ suites, data or machines aren't comparable; `compare` prints a note when they di
 
 ## Where to tweak
 
-| file                   | controls                                                                                       |
-| ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `eval.config.ts`       | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve |
-| `src/eval/headline.ts` | which metrics the tables show, their order, format and noise thresholds                        |
-| `src/eval/slices.ts`   | accuracy subsets                                                                               |
-| `src/data/refine.ts`   | how libpostal's labels map to the output labels                                                |
-| `src/data/gold.ts`     | corpus-level checks that reject or relabel libpostal noise refine can't see                    |
-| `overrides/gold.jsonl` | hand-checked labels for single lines                                                           |
-| `src/labels.ts`        | the label set                                                                                  |
+| file                   | controls                                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eval.config.ts`       | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve                                                     |
+| `src/eval/headline.ts` | which metrics the tables show, their order, format and noise thresholds                                                                            |
+| `src/eval/slices.ts`   | accuracy subsets                                                                                                                                   |
+| `src/data/refine.ts`   | how libpostal's labels map to the output labels                                                                                                    |
+| `src/data/noise.ts`    | formatting noise added to rendered examples (newlines, "Apt4", typos, …) and its rates; `node src/data/build.ts --noise-scale 0` builds clean data |
+| `src/data/gold.ts`     | corpus-level checks that reject or relabel libpostal noise refine can't see                                                                        |
+| `overrides/gold.jsonl` | hand-checked labels for single lines                                                                                                               |
+| `src/labels.ts`        | the label set                                                                                                                                      |
 
 ## Gold labels
 

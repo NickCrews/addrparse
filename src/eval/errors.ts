@@ -100,6 +100,7 @@ for (const ex of wrong.slice(0, limit)) {
       ok ? "" : c.red("✗"),
     ];
   });
-  console.log(`\n${c.bold(ex.text)}  ${c.dim(`${ex.id} (${ex.source})`)}`);
+  const tags = [ex.source, ...(ex.noise ?? [])].join(", ");
+  console.log(`\n${c.bold(ex.text.replaceAll("\n", "\\n"))}  ${c.dim(`${ex.id} (${tags})`)}`);
   console.log(renderTable(["token", "gold", "predicted", ""], rows, ["l", "l", "l", "l"]));
 }

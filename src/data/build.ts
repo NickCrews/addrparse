@@ -7,9 +7,16 @@
  *   all lines builds the corpus counts and finds the texts that overrides apply to.
  * - Exact duplicate texts are dropped. An override applies to every line with its text.
  * - Splits are assigned by `splitFor` (`lines.ts`): 90% train, 5% dev, 5% test.
+ * - Formatting noise (src/data/noise.ts) is added after the split is chosen, from an RNG seeded by
+ *   the line, so noise never moves an address across splits and builds stay deterministic. Both
+ *   the clean and the noisy text count as seen for deduplication; an example whose noisy text was
+ *   already seen is written clean instead.
  *
- *   node src/data/build.ts
+ *   node src/data/build.ts [--noise-scale 1]
+ *
+ * `--noise-scale` multiplies every rate in NOISE_RATES; 0 builds clean data.
  */
+import { parseArgs } from "node:util";
 import {
   createWriteStream,
   existsSync,
@@ -29,9 +36,19 @@ import {
 } from "./gold.ts";
 import { LIBPOSTAL_FILES, LIBPOSTAL_SNAPSHOT, type LibpostalSource } from "./libpostal.ts";
 import { lineKey, refineLine, splitFor } from "./lines.ts";
+import { addNoise, NOISE_NAMES, NOISE_RATES, seededRng, type NoiseName } from "./noise.ts";
 import { DATA_DIR, DATA_STATS_PATH, rawPath, splitPath, type Split } from "./paths.ts";
 
 const SPLITS: readonly Split[] = ["train", "dev", "test"];
+
+const { values: args } = parseArgs({
+  options: { "noise-scale": { type: "string", default: "1" } },
+});
+const noiseScale = Number(args["noise-scale"]);
+if (!(noiseScale >= 0)) throw new Error(`--noise-scale must be a number >= 0`);
+const noiseRates = Object.fromEntries(
+  NOISE_NAMES.map((n) => [n, Math.min(1, NOISE_RATES[n] * noiseScale)]),
+) as Record<NoiseName, number>;
 
 const sources = (Object.keys(LIBPOSTAL_FILES) as LibpostalSource[]).filter((s) =>
   existsSync(rawPath(s)),
@@ -89,6 +106,15 @@ const stats = {
    * rejected by refine or gold.ts, but not lines rejected by an override.
    */
   notes: {} as Record<string, number>,
+  noise: {
+    rates: noiseRates,
+    /** Examples with no noise applied. */
+    clean: 0,
+    /** Examples written clean because their noisy text duplicated an earlier example. */
+    collisions: 0,
+    /** Examples each transform was applied to. */
+    applied: Object.fromEntries(NOISE_NAMES.map((n) => [n, 0])) as Record<string, number>,
+  },
   /** Number of spans per label. */
   labels: {} as Record<string, number>,
 };
@@ -131,10 +157,18 @@ for (const { line, source, i } of rawLines()) {
     continue;
   }
   seen.add(result.text);
-  const ex: Example = { id: `${source}:${i}`, text: result.text, spans, source };
+  const clean: Example = { id: `${source}:${i}`, text: result.text, spans, source };
   const exNotes = noteList(notes);
-  if (exNotes) ex.notes = exNotes;
-  const split = splitFor(ex);
+  if (exNotes) clean.notes = exNotes;
+  const split = splitFor(clean);
+  let ex = addNoise(clean, seededRng(`noise:${line}`), noiseRates);
+  if (ex !== clean && seen.has(ex.text)) {
+    stats.noise.collisions++;
+    ex = clean;
+  }
+  seen.add(ex.text);
+  if (ex.noise) for (const n of ex.noise) bump(stats.noise.applied, n);
+  else stats.noise.clean++;
   outs[split].write(JSON.stringify(ex) + "\n");
   stats.examples++;
   if (override) stats.overrides.examples++;
