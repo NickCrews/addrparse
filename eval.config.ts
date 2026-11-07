@@ -40,6 +40,20 @@ export const SUITES = {
     determinism: false,
     learningCurve: [],
   },
+  /**
+   * Seconds. Runs on the committed fixture in test/fixtures/data (`ADDRPARSE_DATA_DIR`), which
+   * holds exactly this many examples; CI runs it for every impl.
+   */
+  ci: {
+    split: "dev",
+    trainExamples: 400,
+    evalExamples: 100,
+    seed: 1,
+    latency: { warmupPasses: 1, calls: 500 },
+    throughput: { seconds: 0.2, repeats: 1, threads: [1] },
+    determinism: true,
+    learningCurve: [100],
+  },
   /** About a minute for a fast implementation. The inner hill-climbing loop. */
   quick: {
     split: "dev",

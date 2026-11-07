@@ -1,4 +1,6 @@
 node_modules/
-data/
+/data/
 models/
 results/predictions/
+# runs of the ci suite on the fixture data (CI and local checks)
+results/runs/*__ci.json
