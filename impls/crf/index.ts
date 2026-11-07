@@ -16,12 +16,15 @@ import { trainPerceptron } from "./perceptron.ts";
 const TRAINER = "crf" as "crf" | "perceptron";
 /**
  * Features seen fewer times than this in training are left out. On the full suite, 10 instead of
- * 2 gives the same exact match (98.07% vs 98.08%) with a 27% smaller model (380 KB vs 517 KB
- * gzipped); parse speed is the same, since the dropped features are rare words.
+ * 2 gives the same exact match with a 27% smaller model; the dropped features are rare words.
  */
 const MIN_COUNT = 10;
 
-const CRF = { epochs: 10, eta0: 0.1, decay: 0.8, l1: 0.2, minWeight: 0.001 };
+/**
+ * `l1` 0.4 instead of 0.2 keeps a third fewer weights (256 KB vs 380 KB gzipped) at the same
+ * full-suite exact match (98.06% vs 98.07%); 0.8 halves the model again but costs 0.08pp.
+ */
+const CRF = { epochs: 10, eta0: 0.1, decay: 0.8, l1: 0.4, minWeight: 0.001 };
 /** Averaged perceptron weights count updates, so pruning works on a different scale. */
 const PERCEPTRON = { epochs: 8, minWeight: 1 };
 
