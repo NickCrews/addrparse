@@ -101,6 +101,14 @@ nav a[aria-current="page"] {
   color: var(--fg);
   font-weight: 600;
 }
+.repo {
+  margin-left: auto;
+  color: var(--muted);
+  text-decoration: none;
+}
+.repo:hover {
+  color: var(--fg);
+}
 main {
   max-width: 1040px;
   margin: 0 auto;

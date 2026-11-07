@@ -58,6 +58,8 @@ export interface PageContext {
   generated: { at: string; git: string };
 }
 
+const REPO_URL = "https://github.com/NickCrews/addrparse";
+
 // ---------------------------------------------------------------------------------------------
 // Helpers
 
@@ -406,7 +408,7 @@ ${list([
   `Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>.`,
   `Address data from <a href="https://openaddresses.io">OpenAddresses</a> and its government sources, under each source's terms.`,
   `Via <a href="https://github.com/openvenues/libpostal">libpostal</a>'s parser training data, snapshot ${code(s?.libpostalSnapshot ?? "unknown")}.`,
-  `The method of making the training data is <a href="https://github.com/NickCrews/addrparse/tree/main/src/data">src/data/</a> in the repository.`,
+  `The method of making the training data is <a href="${REPO_URL}/tree/main/src/data">src/data/</a> in the repository.`,
   "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
 ])}
 <p>This is a reading of the licenses, not legal advice; see the repository's CONTRIBUTING.md.</p>
@@ -580,6 +582,7 @@ export function renderPage(ctx: PageContext, assets: { css: string; js: string; 
     <a href="#metrics" data-nav="metrics">Metrics</a>
     <a href="#models" data-nav="models">Models</a>
   </nav>
+  <a class="repo" href="${REPO_URL}">GitHub</a>
 </header>
 <main>
 ${home(ctx)}
@@ -590,6 +593,7 @@ ${modelsTab(ctx)}
 Built ${esc(ctx.generated.at)} from ${code(ctx.generated.git)} by <code>pnpm docs</code>.
 Models trained on data © OpenStreetMap contributors (ODbL) and OpenAddresses sources;
 <a href="#metrics/licenses">details</a>.
+Source on <a href="${REPO_URL}">GitHub</a>.
 </footer>
 <script id="page-data" type="application/json">${assets.data}</script>
 <script>${assets.js}</script>
