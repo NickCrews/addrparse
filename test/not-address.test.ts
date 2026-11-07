@@ -9,6 +9,7 @@ import {
 } from "../src/data/not-address.ts";
 import { labelAt, spansFromTokens, tokenize } from "../src/tokens.ts";
 import type { Example } from "../src/types.ts";
+import { pairs } from "./helpers.ts";
 
 const kenai: Example = {
   id: "openaddresses:1",
@@ -29,17 +30,14 @@ function assertWellFormed(ex: Example) {
     assert.ok(s.start < s.end && s.end <= ex.text.length, `${ex.text}: bad span`);
     if (i > 0) assert.ok(ex.spans[i - 1]!.end <= s.start, `${ex.text}: overlap`);
   });
-  for (const t of tokenize(ex.text)) {
+  const tokens = tokenize(ex.text);
+  for (const t of tokens) {
     const covering = ex.spans.filter((s) => s.start <= t.coreStart && t.coreStart < s.end);
     assert.equal(covering.length, 1, `${ex.text}: token at ${t.coreStart} uncovered`);
   }
   // Spans are what a token-level model would produce from the per-token labels.
-  const tokens = tokenize(ex.text);
-  const rebuilt = spansFromTokens(
-    tokens,
-    tokens.map((t) => labelAt(ex.spans, t)),
-  );
-  assert.deepEqual(rebuilt, ex.spans, ex.text);
+  const labels = tokens.map((t) => labelAt(ex.spans, t));
+  assert.deepEqual(spansFromTokens(tokens, labels), ex.spans, ex.text);
 }
 
 describe("notAddressExamples", () => {
@@ -84,10 +82,7 @@ describe("notAddressExamples", () => {
     for (const ex of all.filter((e) => e.source === "embedded")) {
       assertWellFormed(ex);
       const address = ex.spans.filter((s) => s.label !== "NotAddress");
-      assert.deepEqual(
-        address.map((s) => [ex.text.slice(s.start, s.end), s.label]),
-        kenai.spans.map((s) => [kenai.text.slice(s.start, s.end), s.label]),
-      );
+      assert.deepEqual(pairs(ex.text, address), pairs(kenai.text, kenai.spans));
       assert.ok(ex.text.includes(kenai.text), ex.text);
     }
   });

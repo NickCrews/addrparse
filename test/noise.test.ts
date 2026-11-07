@@ -16,8 +16,8 @@ import { DATA_DIR, datasetPath, ROOT } from "../src/data/paths.ts";
 import type { Label } from "../src/labels.ts";
 import type { Example, Span } from "../src/types.ts";
 
-/** Builds an example from [text, label] fields joined by the given separators. */
-function build(fields: [string, Label][], seps: string[]): Example {
+/** Builds an example from [text, label] fields joined by the given separators (default " "). */
+function build(fields: [string, Label][], seps: string[] = []): Example {
   let text = "";
   const spans: Span[] = [];
   fields.forEach(([t, label], i) => {
@@ -64,15 +64,12 @@ describe("transforms", () => {
   });
 
   it("unit-joined removes the space between unit type and number", () => {
-    const ex = build(
-      [
-        ["9", "AddressNumber"],
-        ["Elm", "StreetName"],
-        ["Apt", "OccupancyType"],
-        ["4", "OccupancyIdentifier"],
-      ],
-      [" ", " ", " "],
-    );
+    const ex = build([
+      ["9", "AddressNumber"],
+      ["Elm", "StreetName"],
+      ["Apt", "OccupancyType"],
+      ["4", "OccupancyIdentifier"],
+    ]);
     const out = noised(ex, "unit-joined");
     assert.equal(out.text, "9 Elm Apt4");
     assert.deepEqual(fields(out).slice(2), [
@@ -104,17 +101,11 @@ describe("transforms", () => {
   });
 
   it("unit-joined skips a letter type before a letter identifier", () => {
-    assert.equal(
-      applyNoise(kenai, "unit-joined", seededRng("x"))?.text,
-      "123 N Main St, Apt4B, Kenai, AK 99611",
-    );
-    const ex = build(
-      [
-        ["Apt", "OccupancyType"],
-        ["B", "OccupancyIdentifier"],
-      ],
-      [" "],
-    );
+    assert.equal(noised(kenai, "unit-joined").text, "123 N Main St, Apt4B, Kenai, AK 99611");
+    const ex = build([
+      ["Apt", "OccupancyType"],
+      ["B", "OccupancyIdentifier"],
+    ]);
     assert.equal(applyNoise(ex, "unit-joined", seededRng("x")), undefined);
   });
 
@@ -124,7 +115,7 @@ describe("transforms", () => {
   });
 
   it("drop never removes the only span", () => {
-    const zip = build([["99611", "ZipCode"]], []);
+    const zip = build([["99611", "ZipCode"]]);
     assert.equal(applyNoise(zip, "drop-zip", seededRng("x")), undefined);
   });
 
@@ -146,23 +137,20 @@ describe("transforms", () => {
   });
 
   it("extra-punct leaves whole words alone", () => {
-    const ex = build(
-      [
-        ["12", "AddressNumber"],
-        ["West", "StreetNamePreDirectional"],
-        ["Elm", "StreetName"],
-        ["Road", "StreetNamePostType"],
-        ["Way", "StreetNamePostType"],
-      ],
-      [" ", " ", " ", " "],
-    );
+    const ex = build([
+      ["12", "AddressNumber"],
+      ["West", "StreetNamePreDirectional"],
+      ["Elm", "StreetName"],
+      ["Road", "StreetNamePostType"],
+      ["Way", "StreetNamePostType"],
+    ]);
     assert.equal(applyNoise(ex, "extra-punct", seededRng("x")), undefined);
   });
 
   it("lowercase and uppercase change case only", () => {
     assert.equal(noised(kenai, "lowercase").text, kenai.text.toLowerCase());
     assert.equal(noised(kenai, "uppercase").text, kenai.text.toUpperCase());
-    const caps = build([["MAIN", "StreetName"]], []);
+    const caps = build([["MAIN", "StreetName"]]);
     assert.equal(applyNoise(caps, "uppercase", seededRng("x")), undefined);
   });
 
@@ -315,29 +303,25 @@ describe("noise property", () => {
         checkInvariants({ ...ex, ...out });
         const before = bag(ex);
         const after = bag(out);
+        const labels = out.spans.map((s) => s.label);
+        const labelsBefore = ex.spans.map((s) => s.label);
         switch (name) {
           case "unit-first": {
             assert.deepEqual(after, before);
-            const labels = out.spans.map((s) => s.label);
             const unit = labels.findIndex((l) => l.startsWith("Occupancy"));
             assert.ok(unit >= 0 && unit < labels.indexOf("AddressNumber"));
             const rest = (ls: Label[]) => ls.filter((l) => !l.startsWith("Occupancy"));
-            assert.deepEqual(rest(labels), rest(ex.spans.map((s) => s.label)));
+            assert.deepEqual(rest(labels), rest(labelsBefore));
             break;
           }
-          case "zip-before-state": {
+          case "zip-before-state":
             assert.deepEqual(after, before);
-            const labels = out.spans.map((s) => s.label);
             assert.equal(labels[labels.indexOf("ZipCode") + 1], "StateName");
             break;
-          }
           case "newline":
             assert.deepEqual(after, before);
             assert.equal((out.text.match(/\n/g) ?? []).length, 1);
-            assert.deepEqual(
-              out.spans.map((s) => s.label),
-              ex.spans.map((s) => s.label),
-            );
+            assert.deepEqual(labels, labelsBefore);
             break;
           case "unit-joined": {
             // Only occupancy spans change, and only by whitespace or by "#" moving from the
@@ -376,17 +360,12 @@ describe("noise property", () => {
             break;
           }
           case "lowercase":
-            assert.deepEqual(
-              after,
-              bag(ex, (t) => t.toLowerCase()),
-            );
+          case "uppercase": {
+            const recase = (t: string) =>
+              name === "lowercase" ? t.toLowerCase() : t.toUpperCase();
+            assert.deepEqual(after, bag(ex, recase));
             break;
-          case "uppercase":
-            assert.deepEqual(
-              after,
-              bag(ex, (t) => t.toUpperCase()),
-            );
-            break;
+          }
           case "typo": {
             const changed = ex.spans.filter((s, i) => {
               const o = out.spans[i]!;

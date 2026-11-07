@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import type { Suite } from "../../eval.config.ts";
 import { RUNS_DIR } from "../data/paths.ts";
+import type { ScoredParse } from "../types.ts";
 import type { AccuracyMetrics } from "./accuracy.ts";
 import type { BundleMetrics } from "./bundle.ts";
 
@@ -116,6 +117,17 @@ export function saveRun(run: RunResult): string {
   const path = join(RUNS_DIR, `${run.runId}.json`);
   writeFileSync(path, JSON.stringify(run, null, 2) + "\n");
   return path;
+}
+
+/** A predictions .jsonl file (results/predictions/) by example id. */
+export function readPredictions(path: string): Map<string, ScoredParse> {
+  const byId = new Map<string, ScoredParse>();
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (!line) continue;
+    const p = JSON.parse(line) as ScoredParse & { id: string };
+    byId.set(p.id, p);
+  }
+  return byId;
 }
 
 /** The run's training blend label; runs from before blends existed trained on the default. */

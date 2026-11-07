@@ -192,8 +192,7 @@ async function throughput(a: ThroughputArgs) {
           workerData: { impl: a.impl, model: a.model, texts, seconds: a.seconds },
         }),
     );
-    const ready = workers.map((w) => new Promise((resolve) => w.once("message", resolve)));
-    await Promise.all(ready);
+    await Promise.all(workers.map((w) => new Promise((resolve) => w.once("message", resolve))));
     const done = workers.map(
       (w) =>
         new Promise<{ calls: number; seconds: number }>((resolve, reject) => {

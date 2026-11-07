@@ -116,7 +116,6 @@ h2 {
   margin: 32px 0 8px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
-  scroll-margin-top: 60px;
 }
 h3 {
   font-size: 1.05rem;

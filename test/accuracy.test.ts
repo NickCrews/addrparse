@@ -7,31 +7,19 @@ import {
   scoreAll,
   scoreExample,
 } from "../src/eval/accuracy.ts";
-import type { Label } from "../src/labels.ts";
-import type { Example, Span } from "../src/types.ts";
+import { example, locate as at, pairs } from "./helpers.ts";
 
-/** Builds spans from [substring, label] pairs, located left to right in `text`. */
-function at(text: string, parts: [string, Label][]): Span[] {
-  let from = 0;
-  return parts.map(([s, label]) => {
-    const start = text.indexOf(s, from);
-    assert.ok(start >= 0, `${s} not in ${text}`);
-    from = start + s.length;
-    return { start, end: from, label };
-  });
-}
-
-function example(text: string, parts: [string, Label][], source = "openaddresses"): Example {
-  return { id: text, text, spans: at(text, parts), source };
-}
-
-const kenai = example("12 Main St, Kenai, AK", [
-  ["12", "AddressNumber"],
-  ["Main", "StreetName"],
-  ["St", "StreetNamePostType"],
-  ["Kenai", "PlaceName"],
-  ["AK", "StateName"],
-]);
+const kenai = example(
+  "12 Main St, Kenai, AK",
+  [
+    ["12", "AddressNumber"],
+    ["Main", "StreetName"],
+    ["St", "StreetNamePostType"],
+    ["Kenai", "PlaceName"],
+    ["AK", "StateName"],
+  ],
+  "openaddresses",
+);
 
 describe("normalizeSpans", () => {
   it("trims whitespace and edge commas, clamps to the text and sorts", () => {
@@ -56,10 +44,7 @@ describe("normalizeSpans", () => {
 describe("scoreExample", () => {
   it("counts identical spans as an exact match", () => {
     const s = scoreExample(kenai, kenai.spans);
-    assert.equal(s.exact, true);
-    assert.equal(s.matched, 5);
-    assert.equal(s.tokensCorrect, 5);
-    assert.equal(s.valid, true);
+    assert.partialDeepStrictEqual(s, { exact: true, matched: 5, tokensCorrect: 5, valid: true });
   });
 
   it("ignores a trailing comma included in a predicted span", () => {
@@ -77,9 +62,7 @@ describe("scoreExample", () => {
       ["AK", "StateName"],
     ]);
     const s = scoreExample(kenai, pred);
-    assert.equal(s.exact, false);
-    assert.equal(s.matched, 3);
-    assert.equal(s.tokensCorrect, 4);
+    assert.partialDeepStrictEqual(s, { exact: false, matched: 3, tokensCorrect: 4 });
   });
 
   it("is not an exact match when a gold span is missing", () => {
@@ -96,9 +79,7 @@ describe("scoreExample", () => {
   it("does not let a duplicated prediction stand in for a missing gold span", () => {
     const pred = [...kenai.spans.slice(0, 4), kenai.spans[0]!];
     const s = scoreExample(kenai, pred);
-    assert.equal(s.matched, 4);
-    assert.equal(s.exact, false);
-    assert.equal(s.valid, false);
+    assert.partialDeepStrictEqual(s, { matched: 4, exact: false, valid: false });
   });
 });
 
@@ -114,15 +95,12 @@ describe("coarsenSpans", () => {
       ["4", "OccupancyIdentifier"],
       ["Kenai", "PlaceName"],
     ]);
-    assert.deepEqual(
-      coarsenSpans(text, spans).map((s) => [text.slice(s.start, s.end), s.label]),
-      [
-        ["12", "AddressNumber"],
-        ["N Main St", "StreetName"],
-        ["Apt # 4", "OccupancyIdentifier"],
-        ["Kenai", "PlaceName"],
-      ],
-    );
+    assert.deepEqual(pairs(text, coarsenSpans(text, spans)), [
+      ["12", "AddressNumber"],
+      ["N Main St", "StreetName"],
+      ["Apt # 4", "OccupancyIdentifier"],
+      ["Kenai", "PlaceName"],
+    ]);
   });
 });
 

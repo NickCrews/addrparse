@@ -7,32 +7,22 @@ import { parentPort, workerData } from "node:worker_threads";
 import { asScoredParse } from "../types.ts";
 import { importImpl } from "./impl.ts";
 
-const {
-  impl: name,
-  model,
-  texts,
-  seconds,
-} = workerData as {
-  impl: string;
-  model: string;
-  texts: string[];
-  seconds: number;
-};
-const parser = (await importImpl(name)).load(readFileSync(model));
+type WorkerData = { impl: string; model: string; texts: string[]; seconds: number };
+const { impl, model, texts, seconds } = workerData as WorkerData;
+const parser = (await importImpl(impl)).load(readFileSync(model));
 for (const t of texts) parser.parse(t);
 
 parentPort!.postMessage("ready");
 parentPort!.once("message", () => {
-  const deadline = performance.now() + seconds * 1000;
   const start = performance.now();
+  const deadline = start + seconds * 1000;
   let calls = 0;
   let sink = 0;
   // Check the clock every 64 calls so timing overhead stays negligible.
-  while (true) {
+  do {
     for (let k = 0; k < 64; k++) {
       sink += asScoredParse(parser.parse(texts[calls++ % texts.length]!)).spans.length;
     }
-    if (performance.now() >= deadline) break;
-  }
+  } while (performance.now() < deadline);
   parentPort!.postMessage({ calls, seconds: (performance.now() - start) / 1000, sink });
 });

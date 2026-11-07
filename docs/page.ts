@@ -9,6 +9,7 @@ import { HEADLINE, type Metric } from "../src/eval/headline.ts";
 import type { RunResult } from "../src/eval/results.ts";
 import type { Span } from "../src/types.ts";
 import { DATASET_WEIGHTS } from "../eval.config.ts";
+import { esc, spansHtml } from "./html.ts";
 import { IMPL_NOTES } from "./impl-notes.ts";
 
 export interface DataStats {
@@ -54,10 +55,8 @@ export interface PageContext {
   /** The model attribution paragraph from CONTRIBUTING.md, as plain text. */
   attribution: string;
   example: {
-    impl: string;
     text: string;
     spans: Span[];
-    confidence?: number;
     /** Span text → a note shown next to that span. */
     notes: Record<string, string>;
   };
@@ -68,19 +67,14 @@ export interface PageContext {
 // ---------------------------------------------------------------------------------------------
 // Helpers
 
-export const esc = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
 const int = (n: number) => Math.round(n).toLocaleString("en-US");
 const pct = (n: number, d = 1) => `${(n * 100).toFixed(d)}%`;
 const kb = (n: number) =>
   n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(2)} MB` : `${(n / 1024).toFixed(0)} KB`;
 const sum = (xs: Iterable<number>) => [...xs].reduce((a, b) => a + b, 0);
 
-/** Hue of each label's highlight; app.ts reads the same values from the CSS variables. */
-export const LABEL_HUES: Record<Label, number> = Object.fromEntries(
+/** Hue of each label's highlight, set as `--h` on its `[data-label]` elements. */
+const LABEL_HUES: Record<Label, number> = Object.fromEntries(
   LABEL_NAMES.map((l, i) => [
     l,
     l === "NotAddress" ? -1 : Math.round((i * 360) / (LABEL_NAMES.length - 1)),
@@ -106,19 +100,6 @@ const code = (s: string) => `<code>${esc(s)}</code>`;
 const linkify = (s: string) =>
   esc(s).replace(/https?:\/\/[^\s)]+[^\s).,]/g, (u) => `<a href="${u}">${u}</a>`);
 
-export function spansHtml(text: string, spans: readonly Span[]): string {
-  let out = "";
-  let at = 0;
-  for (const s of [...spans].sort((a, b) => a.start - b.start)) {
-    out += esc(text.slice(at, s.start));
-    out +=
-      `<mark class="lab" data-label="${s.label}" title="${s.label}">` +
-      `${esc(text.slice(s.start, s.end))}</mark>`;
-    at = s.end;
-  }
-  return out + esc(text.slice(at));
-}
-
 const runOf = (ctx: PageContext, impl: string) => ctx.runs.find((r) => r.impl === impl);
 const isReference = (r: RunResult) => !!r.metrics.reference;
 const metric = (name: string) => HEADLINE.find((m) => m.name === name)!;
@@ -132,8 +113,6 @@ const fmt = (m: Metric, r: RunResult | undefined) => {
 
 function home(ctx: PageContext): string {
   const ex = ctx.example;
-  const best = ctx.runs.filter((r) => !isReference(r))[0];
-  const exact = metric("exact match");
   const labelRows = LABEL_NAMES.map((l) => {
     const [meaning, example] = LABELS[l].split(/: (?=[^:]*$)/);
     return [`<mark class="lab" data-label="${l}">${l}</mark>`, esc(meaning!), esc(example ?? "")];
@@ -268,27 +247,22 @@ function trainingData(s: DataStats, suite: string): string {
   const sources = Object.keys(s.linesReadBySource);
   const rejected = (src: string) => sum(Object.values(s.rejectedBySource[src] ?? {}));
   const total = sum(Object.values(s.bySource));
+  const others = Object.keys(s.bySource).filter((src) => !sources.includes(src));
   const sourceRows = [
-    ...sources.map((src) => [
-      code(src),
-      String(DATASET_WEIGHTS[src] ?? 1),
-      int(s.linesReadBySource[src]!),
-      int(rejected(src)),
-      int(s.duplicatesBySource[src] ?? 0),
-      int(s.bySource[src] ?? 0),
-      pct((s.bySource[src] ?? 0) / total),
-    ]),
-    ...Object.keys(s.bySource)
-      .filter((src) => !sources.includes(src))
-      .map((src) => [
-        `${code(src)} (${s.datasets?.[src]?.kind === "labeled" ? "labeled" : "synthetic"})`,
+    ...[...sources, ...others].map((src) => {
+      const read = sources.includes(src);
+      const n = s.bySource[src] ?? 0;
+      const kind = s.datasets?.[src]?.kind === "labeled" ? "labeled" : "synthetic";
+      return [
+        read ? code(src) : `${code(src)} (${kind})`,
         String(DATASET_WEIGHTS[src] ?? 1),
-        "–",
-        "–",
+        read ? int(s.linesReadBySource[src]!) : "–",
+        read ? int(rejected(src)) : "–",
         int(s.duplicatesBySource[src] ?? 0),
-        int(s.bySource[src]!),
-        pct(s.bySource[src]! / total),
-      ]),
+        int(n),
+        pct(n / total),
+      ];
+    }),
     [
       "total",
       "",
@@ -350,16 +324,9 @@ ${table(["reason", "lines"], rejectedRows, { align: ["l", "r"] })}`;
 }
 
 function goldSection(s: DataStats | undefined): string {
-  const notes = s
-    ? Object.entries(s.notes)
-        .filter(([n]) => !n.startsWith("dropped:"))
-        .sort((a, b) => b[1] - a[1])
-    : [];
-  const dropped = s
-    ? Object.entries(s.notes)
-        .filter(([n]) => n.startsWith("dropped:"))
-        .sort((a, b) => b[1] - a[1])
-    : [];
+  const all = Object.entries(s?.notes ?? {}).sort((a, b) => b[1] - a[1]);
+  const notes = all.filter(([n]) => !n.startsWith("dropped:"));
+  const dropped = all.filter(([n]) => n.startsWith("dropped:"));
   return `
 <p>libpostal labels a whole street as one field (<code>road</code>) and a unit as another. The gold
 labels split those fields into this label set with fixed rules (directional and type lexicons,

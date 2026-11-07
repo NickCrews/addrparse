@@ -14,13 +14,7 @@
  * Tokens come back as strings ("Washington,"); spansFromPieces finds them in the text.
  */
 import { isLabel, type Label } from "../../src/labels.ts";
-import { join } from "node:path";
-import {
-  collectPredictions,
-  lockedVersions,
-  runJsonLines,
-  spansFromPieces,
-} from "../../src/eval/reference.ts";
+import { predictWithUv, spansFromPieces } from "../../src/eval/reference.ts";
 import type { ReferenceImpl } from "../../src/types.ts";
 
 const MAP: Record<string, Label | undefined> = {
@@ -33,7 +27,7 @@ const MAP: Record<string, Label | undefined> = {
   Recipient: undefined,
 };
 
-export function mapLabel(label: string, token: string): Label | undefined {
+function mapLabel(label: string, token: string): Label | undefined {
   const mapped = Object.hasOwn(MAP, label) ? MAP[label] : isLabel(label) ? label : undefined;
   if (token === "#" && mapped === "OccupancyIdentifier") return "OccupancyType";
   if (token === "#" && mapped === "USPSBoxID") return "USPSBoxType";
@@ -46,19 +40,6 @@ export function toSpans(text: string, tokens: readonly [string, string][]) {
 }
 
 const impl: ReferenceImpl = {
-  async predict(texts, ctx) {
-    ctx.log(`  usaddress: parsing ${texts.length.toLocaleString("en-US")} texts in Python`);
-    const out = await runJsonLines(
-      "uv",
-      ["run", "--quiet", "--locked", "--script", "predict.py"],
-      texts,
-      {
-        cwd: import.meta.dirname,
-      },
-    );
-    const { unaligned, ...prediction } = collectPredictions(texts, out, toSpans);
-    const versions = lockedVersions(join(import.meta.dirname, "predict.py.lock"));
-    return { ...prediction, info: { ...versions, unaligned } };
-  },
+  predict: (texts, ctx) => predictWithUv("usaddress", import.meta.dirname, texts, ctx, toSpans),
 };
 export default impl;

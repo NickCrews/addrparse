@@ -145,8 +145,8 @@ for (const { line } of rawLines()) {
 }
 
 const datasets = listDatasets();
-// Datasets removed since the last build must not linger, nor the one-file-per-split layout
-// (data/train.jsonl) of builds before datasets were stored apart.
+// Removed datasets must not linger, nor data/<split>.jsonl files of the older one-file-per-split
+// layout.
 for (const split of SPLITS) {
   rmSync(join(DATA_DIR, split), { recursive: true, force: true });
   rmSync(join(DATA_DIR, `${split}.jsonl`), { force: true });
@@ -213,10 +213,6 @@ function reject(source: string, reason: string) {
   bump(stats.rejected, reason);
   bump((stats.rejectedBySource[source] ??= {}), reason);
 }
-function duplicate(source: string) {
-  stats.duplicates++;
-  bump(stats.duplicatesBySource, source);
-}
 
 function write(ex: Example, split = splitFor(ex)) {
   out(split, ex.source).write(JSON.stringify(ex) + "\n");
@@ -229,6 +225,16 @@ function write(ex: Example, split = splitFor(ex)) {
 }
 
 const seen = new Set<string>();
+/** Marks `ex.text` seen, or counts `ex` as a duplicate and returns false if it already was. */
+function isNew(ex: Example): boolean {
+  if (seen.has(ex.text)) {
+    stats.duplicates++;
+    bump(stats.duplicatesBySource, ex.source);
+    return false;
+  }
+  seen.add(ex.text);
+  return true;
+}
 
 /** Writes `clean` with noise from an RNG seeded by `noiseKey`, or clean when `noise` is false. */
 function writeNoisy(clean: Example, noiseKey: string, noise = true) {
@@ -297,25 +303,14 @@ for (const { line, source, i } of rawLines()) {
     }
   }
   for (const note of new Set(notes)) bump(stats.notes, note);
-  if (seen.has(result.text)) {
-    duplicate(source);
-    continue;
-  }
-  seen.add(result.text);
   const clean: Example = { id: `${source}:${i}`, text: result.text, spans, source };
+  if (!isNew(clean)) continue;
   const exNotes = noteList(notes);
   if (exNotes) clean.notes = exNotes;
   writeNoisy(clean, `noise:${line}`);
   if (source === "openaddresses" || source === "osm") pool(clean);
   if (override) stats.overrides.examples++;
-  for (const extra of notAddressExamples(clean, notAddress)) {
-    if (seen.has(extra.text)) {
-      duplicate(extra.source);
-      continue;
-    }
-    seen.add(extra.text);
-    write(extra);
-  }
+  for (const extra of notAddressExamples(clean, notAddress)) if (isNew(extra)) write(extra);
 }
 for (const o of overrides.values()) {
   if (overrideByText.get(o.text) !== o) console.warn(`stale override ${o.key}: ${o.text}`);
@@ -331,17 +326,10 @@ for (const l of localities) {
   byState.get(k)!.push(l);
 }
 
-/** Writes one example from a datasets/ file, unless its text was already written. */
-function writeAdded(ex: Example, noise: boolean) {
-  if (seen.has(ex.text)) return duplicate(ex.source);
-  seen.add(ex.text);
-  writeNoisy(ex, `noise:${ex.id}`, noise);
-}
-
 async function buildAdded(d: DatasetInfo) {
   if (d.kind === "labeled") {
     for (const ex of parseLabeled(readFileSync(d.path!, "utf8"), d.name, d.path)) {
-      writeAdded(ex, false);
+      if (isNew(ex)) writeNoisy(ex, `noise:${ex.id}`, false);
     }
     return;
   }
@@ -369,7 +357,7 @@ async function buildAdded(d: DatasetInfo) {
     } catch (e) {
       throw new Error(`${id}: ${e instanceof Error ? e.message : String(e)}`);
     }
-    writeAdded(ex, def.noise ?? true);
+    if (isNew(ex)) writeNoisy(ex, `noise:${ex.id}`, def.noise ?? true);
   }
 }
 

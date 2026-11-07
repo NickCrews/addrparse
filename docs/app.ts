@@ -3,6 +3,7 @@
  * Routes are `#<tab>` or `#<tab>/<section>`, which scrolls to the element `<tab>-<section>`.
  */
 import type { Span } from "../src/types.ts";
+import { esc, spansHtml } from "./html.ts";
 import type { DemoRow, PageData } from "./page-data.ts";
 import { loadEmbedded } from "./parsers.ts";
 
@@ -49,12 +50,6 @@ const tableEl = $<HTMLTableElement>("pg-table");
 const detail = $("pg-detail");
 const showEmpty = $<HTMLInputElement>("pg-empty");
 const onlyDiff = $<HTMLInputElement>("pg-diff");
-
-const esc = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
 
 // Model checkboxes.
 const modelBox = $("pg-models");
@@ -103,17 +98,6 @@ function cellText(text: string, spans: readonly Span[] | undefined, label: strin
     .join(" · ");
 }
 
-function spansHtml(text: string, spans: readonly Span[]): string {
-  let out = "";
-  let at = 0;
-  for (const s of [...spans].sort((a, b) => a.start - b.start)) {
-    out += esc(text.slice(at, s.start));
-    out += `<mark class="lab" data-label="${s.label}" title="${s.label}">${esc(text.slice(s.start, s.end))}</mark>`;
-    at = s.end;
-  }
-  return out + esc(text.slice(at));
-}
-
 interface Row {
   text: string;
   demo?: DemoRow;
@@ -124,9 +108,8 @@ interface Row {
 let rows: Row[] = [];
 let columns: string[] = [];
 
-function computeRows(models: string[]): Row[] {
-  const lines = input.value.split("\n").filter((l) => l.trim());
-  return lines.slice(0, MAX_LINES).map((text) => {
+function computeRows(lines: string[], models: string[]): Row[] {
+  return lines.map((text) => {
     const demo = data.demo.rows[text];
     const results: Row["results"] = {};
     for (const m of models) {
@@ -151,7 +134,8 @@ function disagreements(row: Row, models: string[]): Set<string> {
 
 function render() {
   const models = selected().filter((m) => data.models.some((x) => x.impl === m));
-  rows = computeRows(models);
+  const lines = input.value.split("\n").filter((l) => l.trim());
+  rows = computeRows(lines.slice(0, MAX_LINES), models);
   const used = new Set<string>();
   for (const r of rows) {
     for (const res of Object.values(r.results)) res?.spans.forEach((s) => used.add(s.label));
@@ -220,9 +204,8 @@ function render() {
   });
   tableEl.innerHTML = rows.length ? head + body : "";
 
-  const lines = input.value.split("\n").filter((l) => l.trim()).length;
   const parts = [`${rows.length} rows`];
-  if (lines > MAX_LINES) parts.push(`first ${MAX_LINES} of ${lines} lines`);
+  if (lines.length > MAX_LINES) parts.push(`first ${MAX_LINES} of ${lines.length} lines`);
   if (models.length > 1) parts.push(`models disagree on ${disagreeRows}`);
   for (const [m, [ok, n]] of Object.entries(exactCounts)) parts.push(`${m} ${ok}/${n} exact`);
   if (onlyDiff.checked) parts.push(`showing ${shown}`);

@@ -10,12 +10,13 @@ import { STATES, goldStates, type Params } from "./model.ts";
 import {
   allowedTransitions,
   denseEmissions,
+  featureRows,
   featureTable,
   rng,
   shuffle,
   type TrainOptions,
 } from "./training.ts";
-import { Viterbi, transIndex } from "./viterbi.ts";
+import { Viterbi, pathTransIndex } from "./viterbi.ts";
 
 export function trainPerceptron(examples: readonly Example[], opts: TrainOptions): Params {
   const L = STATES;
@@ -33,6 +34,7 @@ export function trainPerceptron(examples: readonly Example[], opts: TrainOptions
   let emit = new Float64Array(64 * L);
   let gold = new Uint8Array(64);
   let pred = new Uint8Array(64);
+  let rows: Int32Array = new Int32Array(64 * 64);
   const random = rng(opts.seed);
   const order = Int32Array.from(examples.keys());
   let c = 1;
@@ -50,7 +52,8 @@ export function trainPerceptron(examples: readonly Example[], opts: TrainOptions
         pred = new Uint8Array(n * 2);
       }
       goldStates(fx.tokens, ex.spans, gold);
-      denseEmissions(fx, n, table, w, emit);
+      rows = featureRows(fx, n, table, rows);
+      denseEmissions(fx, n, rows, w, emit);
       viterbi.decode(emit, n, pred);
       let wrong = false;
       for (let i = 0; i < n; i++) {
@@ -59,7 +62,7 @@ export function trainPerceptron(examples: readonly Example[], opts: TrainOptions
         if (g === p) continue;
         wrong = true;
         for (let q = fx.offs[i]!; q < fx.offs[i + 1]!; q++) {
-          const f = table.get(fx.feats[q]!);
+          const f = rows[q]!;
           if (f < 0) continue;
           w[f * L + g]! += 1;
           u[f * L + g]! += c;
@@ -70,15 +73,13 @@ export function trainPerceptron(examples: readonly Example[], opts: TrainOptions
       if (wrong) {
         mistakes++;
         for (let i = 0; i <= n; i++) {
-          const ga = i === 0 ? L : gold[i - 1]!;
-          const gb = i === n ? L : gold[i]!;
-          const pa = i === 0 ? L : pred[i - 1]!;
-          const pb = i === n ? L : pred[i]!;
-          if (ga === pa && gb === pb) continue;
-          tw[transIndex(L, ga, gb)]! += 1;
-          tu[transIndex(L, ga, gb)]! += c;
-          tw[transIndex(L, pa, pb)]! -= 1;
-          tu[transIndex(L, pa, pb)]! -= c;
+          const g = pathTransIndex(L, gold, n, i);
+          const p = pathTransIndex(L, pred, n, i);
+          if (g === p) continue;
+          tw[g]! += 1;
+          tu[g]! += c;
+          tw[p]! -= 1;
+          tu[p]! -= c;
         }
       }
       c++;

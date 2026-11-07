@@ -10,21 +10,15 @@
  * labels by the same rules that derive the gold labels from libpostal's training data
  * (src/data/refine.ts): `road` → StreetNamePre/PostDirectional, StreetNamePre/PostType,
  * StreetName; `unit`, `level` → OccupancyType/Identifier; `po_box` → USPSBoxGroupType/ID,
- * USPSBoxType/ID. The fine
- * labels therefore score libpostal plus those rules; the coarse metrics score libpostal alone.
- * Fields our gold removes from the text (suburb, house, ...) get no label.
+ * USPSBoxType/ID. The fine labels therefore score libpostal plus those rules; the coarse metrics
+ * score libpostal alone. Fields our gold removes from the text (suburb, house, ...) get no label.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mergeAdjacent } from "../../src/eval/accuracy.ts";
 import { refineOccupancy, refinePoBox, refineRoad } from "../../src/data/refine.ts";
-import {
-  alignPieces,
-  collectPredictions,
-  lockedVersions,
-  runJsonLines,
-} from "../../src/eval/reference.ts";
+import { alignPieces, predictWithUv } from "../../src/eval/reference.ts";
 import type { Label } from "../../src/labels.ts";
 import { tokenize } from "../../src/tokens.ts";
 import type { ReferenceImpl, Span } from "../../src/types.ts";
@@ -110,24 +104,12 @@ function modelVersions(dir: string): Record<string, string> {
 }
 
 const impl: ReferenceImpl = {
-  async predict(texts, ctx) {
+  predict(texts, ctx) {
     const LIBPOSTAL_DATA_DIR = dataDir();
-    ctx.log(`  libpostal: parsing ${texts.length.toLocaleString("en-US")} texts in Python`);
-    const out = await runJsonLines(
-      "uv",
-      ["run", "--quiet", "--locked", "--script", "predict.py"],
-      texts,
-      {
-        cwd: import.meta.dirname,
-        env: { ...process.env, LIBPOSTAL_DATA_DIR },
-      },
-    );
-    const { unaligned, ...prediction } = collectPredictions(texts, out, toSpans);
-    const versions = lockedVersions(join(import.meta.dirname, "predict.py.lock"));
-    return {
-      ...prediction,
-      info: { ...versions, ...modelVersions(LIBPOSTAL_DATA_DIR), unaligned },
-    };
+    return predictWithUv("libpostal", import.meta.dirname, texts, ctx, toSpans, {
+      env: { ...process.env, LIBPOSTAL_DATA_DIR },
+      extraInfo: modelVersions(LIBPOSTAL_DATA_DIR),
+    });
   },
 };
 export default impl;

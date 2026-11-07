@@ -61,19 +61,8 @@ export const DIRECTIONALS: ReadonlySet<string> = new Set([
  * them ("Sowst", "Northwst"), minus English words the compounding produces.
  */
 const NORTH_SOUTH: ReadonlySet<string> = new Set([
-  "n",
-  "no",
-  "nth",
-  "nrth",
-  "nrt",
-  "nort",
-  "norh",
-  "north",
-  "s",
-  "so",
-  "sth",
-  "sou",
-  "south",
+  ...["n", "no", "nth", "nrth", "nrt", "nort", "norh", "north"],
+  ...["s", "so", "sth", "sou", "south"],
 ]);
 const EAST_WEST: ReadonlySet<string> = new Set(["e", "east", "w", "wst", "west"]);
 export const ABBREVIATED_DIRECTIONALS: ReadonlySet<string> = (() => {
@@ -208,19 +197,8 @@ const VENUE_CITY = /^comfort inn\b/;
 
 /** Fields whose tokens are removed from the rendered text. */
 const DROPPED = new Set([
-  "suburb",
-  "city_district",
-  "state_district",
-  "island",
-  "country_region",
-  "world_region",
-  "house",
-  "building",
-  "staircase",
-  "entrance",
-  "metro_station",
-  "phone",
-  "website",
+  ...["suburb", "city_district", "state_district", "island", "country_region", "world_region"],
+  ...["house", "building", "staircase", "entrance", "metro_station", "phone", "website"],
 ]);
 
 const SIMPLE: Record<string, Label> = {

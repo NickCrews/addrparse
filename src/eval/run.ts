@@ -36,21 +36,22 @@ import {
 } from "../data/blend.ts";
 import { hashSplit, loadExamples, readManifest } from "../data/load.ts";
 import { MODELS_DIR, PREDICTIONS_DIR, type Split } from "../data/paths.ts";
-import type { Example, ReferenceImpl, ScoredParse, Span } from "../types.ts";
+import type { Example, ReferenceImpl, ReferencePrediction } from "../types.ts";
 import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
 import { bundleImpl } from "./bundle.ts";
-import type { LatencyArgs, PredictArgs, ModelArgs, ThroughputArgs, TrainArgs } from "./child.ts";
+import type { LatencyArgs, PredictArgs, ModelArgs, ThroughputArgs } from "./child.ts";
 import {
   ensureModel as ensureCachedModel,
   gitInfo,
   machineInfo,
   runChild,
   sha256,
+  trainInChild,
   type Training,
 } from "./models.ts";
 import { implCodeSize, implSourceHash, importReference, listImpls } from "./impl.ts";
 import { c, comparabilityNotes, deltaTable, detailTables, sideBySideTable } from "./report.ts";
-import { loadRuns, saveRun, trainBlendOf, type RunResult } from "./results.ts";
+import { loadRuns, readPredictions, saveRun, trainBlendOf, type RunResult } from "./results.ts";
 
 const STEPS = [
   "accuracy",
@@ -154,16 +155,11 @@ async function predict(impl: string, model: string, out: string, examples: reado
     model,
     out,
   } satisfies PredictArgs);
-  const byId = new Map<string, ScoredParse>();
-  for (const line of readFileSync(out, "utf8").split("\n")) {
-    if (!line) continue;
-    const p = JSON.parse(line) as ScoredParse & { id: string };
-    byId.set(p.id, p);
-  }
+  const byId = readPredictions(out);
   const parses = examples.map((ex) => byId.get(ex.id));
   return {
     ...r,
-    predictions: parses.map((p) => p?.spans ?? []),
+    spans: parses.map((p) => p?.spans ?? []),
     confidences: parses.map((p) => p?.confidence),
   };
 }
@@ -188,9 +184,12 @@ function newRunId(impl: string, started: Date): string {
   ].join("__");
 }
 
-/** The latest earlier run of the same impl, suite and split that measured at least `run` did. */
+/**
+ * The latest earlier run of the same impl, suite, split and training blend that measured at least
+ * what `run` did, so `--only` runs don't become the baseline for a full one; failing that, the
+ * latest earlier run.
+ */
 function previousRun(run: RunResult): RunResult | undefined {
-  // Failing that, the latest earlier run, so `--only` runs don't become the baseline for a full one.
   const measured = Object.keys(run.metrics) as (keyof RunResult["metrics"])[];
   const earlier = loadRuns().filter(
     (r) =>
@@ -205,6 +204,23 @@ function previousRun(run: RunResult): RunResult | undefined {
   );
 }
 
+/** Scores predictions as a run's accuracy metrics and logs exact match and token accuracy. */
+function scoreRun(
+  examples: readonly Example[],
+  p: Omit<ReferencePrediction, "info"> & { confidences?: (number | undefined)[] },
+  t0: number,
+) {
+  const a = {
+    ...scoreAll(examples, p.spans, p.confidences),
+    parseErrors: p.parseErrors,
+    firstParseError: p.firstError,
+  };
+  log(
+    `  accuracy: exact ${(a.exactMatch * 100).toFixed(2)}%, token ${(a.tokenAccuracy * 100).toFixed(2)}% (${secs(t0)})`,
+  );
+  return a;
+}
+
 /** Scores a ReferenceImpl's predictions; its run has accuracy and nothing else. */
 async function evalReference(
   impl: string,
@@ -217,10 +233,8 @@ async function evalReference(
   const t0 = now();
   log(c.bold(`${impl}`) + c.dim(` (${runId}, reference: accuracy only)`));
   if (only || opts.retrain) log(c.yellow(`  --only and --retrain don't apply to a reference`));
-  const p = await reference.predict(
-    evalExamples.map((ex) => ex.text),
-    { log },
-  );
+  const texts = evalExamples.map((ex) => ex.text);
+  const p = await reference.predict(texts, { log });
   if (p.spans.length !== evalExamples.length) {
     throw new Error(`${impl} returned ${p.spans.length} parses for ${evalExamples.length} texts`);
   }
@@ -231,17 +245,9 @@ async function evalReference(
   );
   const seconds = (now() - t0) / 1000;
   const metrics: RunResult["metrics"] = {
-    accuracy: {
-      ...scoreAll(evalExamples, p.spans),
-      parseErrors: p.parseErrors,
-      firstParseError: p.firstError,
-    },
+    accuracy: scoreRun(evalExamples, p, t0),
     reference: { seconds, info: p.info },
   };
-  const a = metrics.accuracy!;
-  log(
-    `  accuracy: exact ${(a.exactMatch * 100).toFixed(2)}%, token ${(a.tokenAccuracy * 100).toFixed(2)}% (${secs(t0)})`,
-  );
   if (p.parseErrors) log(c.red(`  ${p.parseErrors} parse errors, first: ${p.firstError}`));
   const run: RunResult = {
     runId,
@@ -280,16 +286,8 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     mkdirSync(PREDICTIONS_DIR, { recursive: true });
     const out = join(PREDICTIONS_DIR, `${runId}.jsonl`);
     const p = await predict(impl, main.model, out, evalExamples);
-    metrics.accuracy = {
-      ...scoreAll(evalExamples, p.predictions, p.confidences),
-      parseErrors: p.parseErrors,
-      firstParseError: p.firstError,
-    };
-    const a = metrics.accuracy;
-    log(
-      `  accuracy: exact ${(a.exactMatch * 100).toFixed(2)}%, token ${(a.tokenAccuracy * 100).toFixed(2)}% (${secs(t0)})`,
-    );
-    const rc = a.riskCoverage;
+    metrics.accuracy = scoreRun(evalExamples, p, t0);
+    const rc = metrics.accuracy.riskCoverage;
     if (rc) {
       const at = rc.atTarget;
       log(
@@ -339,16 +337,11 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     metrics.throughput = {};
     for (const threads of config.throughput.threads) {
       const t0 = now();
-      const r = await runChild<NonNullable<RunResult["metrics"]["throughput"]>[string]>(
-        "throughput",
-        {
-          ...modelArgs,
-          seconds: config.throughput.seconds,
-          repeats: config.throughput.repeats,
-          threads,
-        } satisfies ThroughputArgs,
-      );
-      metrics.throughput[String(threads)] = r;
+      const r = (metrics.throughput[String(threads)] = await runChild("throughput", {
+        ...modelArgs,
+        ...config.throughput,
+        threads,
+      } satisfies ThroughputArgs));
       log(
         `  throughput ${threads}t: ${Math.round(r.callsPerSec).toLocaleString("en-US")}/s (${secs(t0)})`,
       );
@@ -357,18 +350,14 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
   if (enabled("determinism")) {
     const t0 = now();
     const again = join(MODELS_DIR, impl, `determinism-${process.pid}.bin`);
-    await runChild(
-      "train",
-      {
-        impl,
-        split: "train",
-        n: config.trainExamples,
-        seed: config.seed,
-        weights: trainWeights,
-        out: again,
-      } satisfies TrainArgs,
-      ["--max-old-space-size=16384"],
-    );
+    await trainInChild({
+      impl,
+      split: "train",
+      n: config.trainExamples,
+      seed: config.seed,
+      weights: trainWeights,
+      out: again,
+    });
     const hashes: [string, string] = [
       sha256(readFileSync(main.model)).slice(0, 16),
       sha256(readFileSync(again)).slice(0, 16),
@@ -389,7 +378,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
       const out = join(os.tmpdir(), `addrparse-curve-${process.pid}.jsonl`);
       const p = await predict(impl, model, out, evalExamples);
       rmSync(out);
-      const a = scoreAll(evalExamples, p.predictions);
+      const a = scoreAll(evalExamples, p.spans);
       metrics.learningCurve.push({
         trainExamples: n,
         exactMatch: a.exactMatch,
@@ -421,8 +410,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     metrics,
   };
   const previous = previousRun(run);
-  const path = saveRun(run);
-  log(c.dim(`  saved ${path} (${secs(tImpl)})`));
+  log(c.dim(`  saved ${saveRun(run)} (${secs(tImpl)})`));
   return { run, previous };
 }
 

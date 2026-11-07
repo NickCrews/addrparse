@@ -13,9 +13,9 @@ import {
   spansFromStates,
 } from "../impls/crf/model.ts";
 import { Viterbi, transIndex } from "../impls/crf/viterbi.ts";
-import type { Label } from "../src/labels.ts";
 import { tokenize } from "../src/tokens.ts";
-import { asScoredParse, type Example, type Span } from "../src/types.ts";
+import { asScoredParse, type Example } from "../src/types.ts";
+import { example } from "./helpers.ts";
 
 /** Deterministic pseudo-random numbers in [0, 1). */
 function random(seed: number): () => number {
@@ -145,16 +145,6 @@ describe("ForwardBackward", () => {
 });
 
 describe("states", () => {
-  const example = (text: string, parts: [string, Label][]): Example => {
-    let from = 0;
-    const spans: Span[] = parts.map(([s, label]) => {
-      const start = text.indexOf(s, from);
-      from = start + s.length;
-      return { start, end: from, label };
-    });
-    return { id: text, text, spans, source: "test" };
-  };
-
   it("round-trips gold spans, including adjacent spans of one label", () => {
     const examples = [
       example("12 Main St, Kenai, AK", [
@@ -224,51 +214,34 @@ describe("model format", () => {
 });
 
 describe("crf impl", () => {
-  const texts: [string, [string, Label][]][] = [
-    [
-      "12 Main St, Kenai, AK 99611",
-      [
-        ["12", "AddressNumber"],
-        ["Main", "StreetName"],
-        ["St", "StreetNamePostType"],
-        ["Kenai", "PlaceName"],
-        ["AK", "StateName"],
-        ["99611", "ZipCode"],
-      ],
-    ],
-    [
-      "400 Oak Ave, Homer, AK 99603",
-      [
-        ["400", "AddressNumber"],
-        ["Oak", "StreetName"],
-        ["Ave", "StreetNamePostType"],
-        ["Homer", "PlaceName"],
-        ["AK", "StateName"],
-        ["99603", "ZipCode"],
-      ],
-    ],
-    [
-      "PO Box 77, Nome, AK 99762",
-      [
-        ["PO Box", "USPSBoxType"],
-        ["77", "USPSBoxID"],
-        ["Nome", "PlaceName"],
-        ["AK", "StateName"],
-        ["99762", "ZipCode"],
-      ],
-    ],
+  const addresses = [
+    example("12 Main St, Kenai, AK 99611", [
+      ["12", "AddressNumber"],
+      ["Main", "StreetName"],
+      ["St", "StreetNamePostType"],
+      ["Kenai", "PlaceName"],
+      ["AK", "StateName"],
+      ["99611", "ZipCode"],
+    ]),
+    example("400 Oak Ave, Homer, AK 99603", [
+      ["400", "AddressNumber"],
+      ["Oak", "StreetName"],
+      ["Ave", "StreetNamePostType"],
+      ["Homer", "PlaceName"],
+      ["AK", "StateName"],
+      ["99603", "ZipCode"],
+    ]),
+    example("PO Box 77, Nome, AK 99762", [
+      ["PO Box", "USPSBoxType"],
+      ["77", "USPSBoxID"],
+      ["Nome", "PlaceName"],
+      ["AK", "StateName"],
+      ["99762", "ZipCode"],
+    ]),
   ];
   const examples: Example[] = [];
   for (let k = 0; k < 20; k++) {
-    for (const [text, parts] of texts) {
-      let from = 0;
-      const spans = parts.map(([s, label]) => {
-        const start = text.indexOf(s, from);
-        from = start + s.length;
-        return { start, end: from, label };
-      });
-      examples.push({ id: `${k}:${text}`, text, spans, source: "test" });
-    }
+    for (const ex of addresses) examples.push({ ...ex, id: `${k}:${ex.text}` });
   }
   const log = () => {};
 

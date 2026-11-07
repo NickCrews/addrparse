@@ -24,7 +24,7 @@ const fnv = (h: number, c: number) => Math.imul(h ^ c, 0x01000193);
  * murmur3 finalizer over a template id and a value hash, as an int32 (V8 keeps int32s unboxed).
  * Never returns 0, the empty slot of a FeatureTable.
  */
-export function mix(template: number, value: number): number {
+function mix(template: number, value: number): number {
   let h = (value ^ Math.imul(template + 1, 0x9e3779b1)) | 0;
   h ^= h >>> 16;
   h = Math.imul(h, 0x85ebca6b);
@@ -273,11 +273,9 @@ export class Features {
             ? CLS_DIGIT
             : lc !== c
               ? CLS_UPPER
-              : lc >= 97 && lc <= 122
+              : (lc >= 97 && lc <= 122) || c > 127
                 ? CLS_LOWER
-                : c > 127
-                  ? CLS_LOWER
-                  : c;
+                : c;
         if (k - s < 8) sh = fnv(sh, cls);
         if (cls !== prevCls) csh = fnv(csh, cls);
         prevCls = cls;

@@ -8,8 +8,16 @@ import type { Example } from "../../src/types.ts";
 import { Features } from "./features.ts";
 import { STATES, goldStates, type Params } from "./model.ts";
 import { ForwardBackward } from "./forward-backward.ts";
-import { allowedTransitions, featureTable, rng, shuffle, type TrainOptions } from "./training.ts";
-import { transIndex } from "./viterbi.ts";
+import {
+  allowedTransitions,
+  denseEmissions,
+  featureRows,
+  featureTable,
+  rng,
+  shuffle,
+  type TrainOptions,
+} from "./training.ts";
+import { pathTransIndex, transIndex } from "./viterbi.ts";
 
 export interface CrfOptions extends TrainOptions {
   /** L1 strength per training example: the objective is NLL summed over examples + l1 * |w|. */
@@ -35,7 +43,7 @@ export function trainCrf(examples: readonly Example[], opts: CrfOptions): Params
   const fx = new Features();
   let emit = new Float64Array(64 * L);
   let gold = new Uint8Array(64);
-  let rows = new Int32Array(64 * 64);
+  let rows: Int32Array = new Int32Array(64 * 64);
   const random = rng(opts.seed);
   const order = Int32Array.from(examples.keys());
   /** Total L1 penalty each weight could have received so far. */
@@ -61,26 +69,15 @@ export function trainCrf(examples: readonly Example[], opts: CrfOptions): Params
         emit = new Float64Array(n * L * 2);
         gold = new Uint8Array(n * 2);
       }
-      const nFeats = fx.offs[n]!;
-      if (rows.length < nFeats) rows = new Int32Array(nFeats * 2);
-      for (let k = 0; k < nFeats; k++) rows[k] = table.get(fx.feats[k]!);
+      rows = featureRows(fx, n, table, rows);
       goldStates(fx.tokens, ex.spans, gold);
-
-      // Scores.
-      emit.fill(0, 0, n * L);
-      for (let i = 0; i < n; i++) {
-        for (let k = fx.offs[i]!; k < fx.offs[i + 1]!; k++) {
-          const f = rows[k]!;
-          if (f < 0) continue;
-          for (let y = 0; y < L; y++) emit[i * L + y]! += w[f * L + y]!;
-        }
-      }
+      denseEmissions(fx, n, rows, w, emit);
       fb.setTransitions(tw);
       fb.run(emit, n);
       let goldScore = 0;
       for (let i = 0; i <= n; i++) {
         if (i < n) goldScore += emit[i * L + gold[i]!]!;
-        goldScore += tw[transIndex(L, i === 0 ? L : gold[i - 1]!, i === n ? L : gold[i]!)]!;
+        goldScore += tw[pathTransIndex(L, gold, n, i)]!;
       }
       loss += fb.logZ - goldScore;
 
@@ -97,10 +94,9 @@ export function trainCrf(examples: readonly Example[], opts: CrfOptions): Params
         }
       }
       // Gradient step on transitions: gold counts minus expected counts.
-      const { alpha, beta, expEmit, expTrans, scale, src, srcPtr } = fb;
-      for (let i = 0; i <= n; i++) {
-        tw[transIndex(L, i === 0 ? L : gold[i - 1]!, i === n ? L : gold[i]!)]! += eta;
-      }
+      const { alpha, beta, expEmit, expTrans, scale } = fb;
+      const { src, srcPtr } = fb.sources;
+      for (let i = 0; i <= n; i++) tw[pathTransIndex(L, gold, n, i)]! += eta;
       for (let y = 0; y < L; y++) {
         tw[transIndex(L, L, y)]! -= eta * node[y]!;
         tw[transIndex(L, y, L)]! -= eta * node[(n - 1) * L + y]!;
@@ -119,6 +115,7 @@ export function trainCrf(examples: readonly Example[], opts: CrfOptions): Params
 
       // L1 penalty on the weights this example touched.
       u += (eta * opts.l1) / N;
+      const nFeats = fx.offs[n]!;
       for (let k = 0; k < nFeats; k++) {
         const f = rows[k]!;
         if (f < 0) continue;

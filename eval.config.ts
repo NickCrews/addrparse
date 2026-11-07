@@ -27,7 +27,7 @@ export const DATASET_WEIGHTS: Record<string, number> = {
  * eval set always uses the default blend.
  */
 export const BLENDS: Record<string, Blend> = {
-  /** The libpostal-derived data alone, as before the synthetic address forms were added. */
+  /** The libpostal-derived data alone, without the synthetic address forms. */
   "libpostal-only": { use: ["libpostal", "not-address"] },
   /** No NotAddress examples: what abstaining costs and buys. */
   "no-not-address": { without: ["not-address"] },

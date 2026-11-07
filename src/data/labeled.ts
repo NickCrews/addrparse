@@ -19,7 +19,7 @@ export function checkSpans(text: string, spans: readonly Span[]): void {
   let end = 0;
   for (const s of spans) {
     const what = `span ${JSON.stringify(text.slice(s.start, s.end))} (${s.label})`;
-    if (!isLabel(s.label)) throw new Error(`${what}: unknown label`);
+    if (!isLabel(s.label)) throw new Error(`${what}: unknown label ${s.label}`);
     if (!(Number.isInteger(s.start) && Number.isInteger(s.end) && s.start < s.end)) {
       throw new Error(`${what}: bad range [${s.start}, ${s.end})`);
     }
@@ -60,9 +60,7 @@ export function parseLabeled(src: string, dataset: string, file = `${dataset}.js
       const pairs = o.spans.filter(Array.isArray) as [string, string][];
       let spans: Span[];
       if (pairs.length === o.spans.length) {
-        for (const [piece, label] of pairs) {
-          if (!isLabel(label)) throw new Error(`${JSON.stringify(piece)}: unknown label ${label}`);
-        }
+        // Labels are checked with the spans, by checkSpans.
         spans = resolveSpans(o.text, pairs as [string, never][]);
       } else if (pairs.length === 0) {
         spans = o.spans as Span[];

@@ -39,7 +39,7 @@ const EXAMPLE_NOTES: Record<string, string> = {
   stree: "the typo is still the street type",
   "Oklahoma City": '"Oklahoma" isn\'t mistaken for the state',
 };
-/** Parsers the page describes, besides those with a run; noop is the harness's floor. */
+/** Impls the page leaves out; noop is the harness's floor, not a parser. */
 const SKIP = new Set(["noop"]);
 
 const { values: opts } = parseArgs({
@@ -107,8 +107,10 @@ for (const impl of Object.keys(LOADERS)) {
   }
 }
 
-// References: their predictions from the run's saved predictions file, when it matches.
+// References' predictions come from the run's saved predictions file, when it is of this eval set.
 for (const [impl, run] of latest) {
+  if (run.data.evalHash !== evalHash)
+    note(impl, "scored on a different dev set than the current one");
   if (!run.metrics.reference) continue;
   const path = join(PREDICTIONS_DIR, `${run.runId}.jsonl`);
   if (!existsSync(path) || run.data.evalHash !== evalHash) {
@@ -122,10 +124,6 @@ for (const [impl, run] of latest) {
     byId.set(p.id, p.spans);
   }
   predictions.push({ impl, spans: examples.map((ex) => byId.get(ex.id) ?? []), inPage: false });
-}
-for (const [impl, run] of latest) {
-  if (run.data.evalHash !== evalHash)
-    note(impl, "scored on a different dev set than the current one");
 }
 
 // Display order: trained impls by exact match, then references by exact match.
@@ -148,7 +146,6 @@ const stats = existsSync(DATA_STATS_PATH)
   ? (JSON.parse(readFileSync(DATA_STATS_PATH, "utf8")) as DataStats)
   : undefined;
 
-const example = parsers[best]!(EXAMPLE_TEXT);
 const git = gitInfo();
 const ctx: PageContext = {
   suite,
@@ -161,13 +158,7 @@ const ctx: PageContext = {
   embedded: embeddedSizes,
   stats,
   attribution: readAttribution(),
-  example: {
-    impl: best,
-    text: EXAMPLE_TEXT,
-    spans: example.spans,
-    confidence: example.confidence,
-    notes: EXAMPLE_NOTES,
-  },
+  example: { text: EXAMPLE_TEXT, spans: parsers[best]!(EXAMPLE_TEXT).spans, notes: EXAMPLE_NOTES },
   demo: { sets: demo.sets.length, rows: Object.keys(demo.rows).length },
   generated: {
     at: new Date().toISOString().slice(0, 10),

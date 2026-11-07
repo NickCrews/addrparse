@@ -13,6 +13,7 @@ import { LABEL_NAMES, type Label } from "../../src/labels.ts";
 import type { ScoredParse, Span } from "../../src/types.ts";
 import { Features, type Tokens } from "./features.ts";
 import { ForwardBackward } from "./forward-backward.ts";
+import { FeatureTable } from "./table.ts";
 import { Viterbi } from "./viterbi.ts";
 
 // ---------------------------------------------------------------------------------------------
@@ -51,13 +52,7 @@ export function goldStates(tokens: Tokens, spans: readonly Span[], out: Uint8Arr
   let prevLabel = -1;
   for (let i = 0; i < tokens.n; i++) {
     const c = tokens.coreStart[i]!;
-    let span = -1;
-    for (let s = 0; s < spans.length; s++) {
-      if (spans[s]!.start <= c && c < spans[s]!.end) {
-        span = s;
-        break;
-      }
-    }
+    const span = spans.findIndex((s) => s.start <= c && c < s.end);
     if (span < 0) {
       out[i] = NONE;
       prevLabel = -1;
@@ -204,40 +199,22 @@ export function decode(bytes: Uint8Array): SparseParams {
 // ---------------------------------------------------------------------------------------------
 // Inference
 
-/**
- * Open-addressing table from feature hash to row, three int32s per slot: hash (0 = empty),
- * first entry, end entry.
- */
-function buildSlots(p: SparseParams): Int32Array {
-  let slots = 16;
-  while (slots < p.keys.length * 2) slots *= 2;
-  const table = new Int32Array(slots * 3);
-  const mask = slots - 1;
-  for (let k = 0; k < p.keys.length; k++) {
-    const key = p.keys[k]!;
-    let s = key & mask;
-    while (table[s * 3] !== 0) s = (s + 1) & mask;
-    table[s * 3] = key;
-    table[s * 3 + 1] = p.rowPtr[k]!;
-    table[s * 3 + 2] = p.rowPtr[k + 1]!;
-  }
-  return table;
-}
-
 export class CrfParser {
   private readonly fx = new Features();
   private readonly viterbi: Viterbi;
   private readonly fb: ForwardBackward;
-  private readonly table: Int32Array;
-  private readonly mask: number;
+  /** Feature hash to row of `rowPtr`. */
+  private readonly rows: FeatureTable;
+  private readonly rowPtr: Int32Array;
   private readonly states: Uint8Array;
   private readonly values: Float64Array;
   private emit = new Float64Array(64 * STATES);
   private path = new Uint8Array(64);
 
   constructor(p: SparseParams) {
-    this.table = buildSlots(p);
-    this.mask = this.table.length / 3 - 1;
+    this.rows = new FeatureTable(p.keys.length);
+    for (let k = 0; k < p.keys.length; k++) this.rows.slot(p.keys[k]!, k);
+    this.rowPtr = p.rowPtr;
     this.states = p.states;
     this.values = Float64Array.from(p.values);
     const trans = Float64Array.from(p.trans);
@@ -255,28 +232,17 @@ export class CrfParser {
       this.emit = new Float64Array(n * L * 2);
       this.path = new Uint8Array(n * 2);
     }
-    const emit = this.emit;
+    const { emit, rows, rowPtr, states, values } = this;
+    const { feats, offs } = fx;
     emit.fill(0, 0, n * L);
-    const feats = fx.feats;
-    const offs = fx.offs;
-    const table = this.table;
-    const mask = this.mask;
-    const states = this.states;
-    const values = this.values;
     for (let i = 0; i < n; i++) {
       const row = i * L;
       const end = offs[i + 1]!;
       for (let q = offs[i]!; q < end; q++) {
-        const key = feats[q]!;
-        let s = key & mask;
-        let k = table[s * 3]!;
-        while (k !== key && k !== 0) {
-          s = (s + 1) & mask;
-          k = table[s * 3]!;
-        }
-        if (k === 0) continue;
-        const e1 = table[s * 3 + 2]!;
-        for (let e = table[s * 3 + 1]!; e < e1; e++) emit[row + states[e]!]! += values[e]!;
+        const k = rows.get(feats[q]!);
+        if (k < 0) continue;
+        const e1 = rowPtr[k + 1]!;
+        for (let e = rowPtr[k]!; e < e1; e++) emit[row + states[e]!]! += values[e]!;
       }
     }
     const best = this.viterbi.decode(emit, n, this.path);

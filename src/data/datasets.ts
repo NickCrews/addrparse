@@ -54,7 +54,6 @@ export function listDatasets(dir = DATASETS_DIR): DatasetInfo[] {
   const files = existsSync(dir) ? readdirSync(dir).sort() : [];
   for (const file of files) {
     const m = /^(.+)\.(ts|jsonl)$/.exec(file);
-    // `_helpers.ts` files are shared code, not datasets.
     if (!m || file.startsWith("_")) continue;
     const name = m[1]!;
     if (!NAME.test(name)) {

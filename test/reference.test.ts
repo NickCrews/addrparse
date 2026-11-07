@@ -11,25 +11,27 @@ import {
   lockedVersions,
   runJsonLines,
 } from "../src/eval/reference.ts";
-import type { Span } from "../src/types.ts";
-
-/** `[substring, label]` of each span, for readable assertions. */
-const show = (text: string, spans: readonly Span[]) =>
-  spans.map((s) => [text.slice(s.start, s.end), s.label]);
+import { pairs as show } from "./helpers.ts";
 
 describe("alignPieces", () => {
+  /** The text each piece aligned to. */
+  const aligned = (text: string, pieces: string[]) =>
+    alignPieces(text, pieces).map((r) => r && text.slice(r.start, r.end));
+
   it("matches pieces ignoring case, accents, whitespace and punctuation", () => {
-    const text = "2700 Southwest Ek Ro, São Paulo, OR";
-    const ranges = alignPieces(text, ["2700", "southwest ek ro", "sao paulo", "or"]);
     assert.deepEqual(
-      ranges.map((r) => r && text.slice(r.start, r.end)),
+      aligned("2700 Southwest Ek Ro, São Paulo, OR", [
+        "2700",
+        "southwest ek ro",
+        "sao paulo",
+        "or",
+      ]),
       ["2700", "Southwest Ek Ro", "São Paulo", "OR"],
     );
   });
 
   it("matches punctuation-only pieces literally and in order", () => {
-    const text = "Apt # 4 # 5";
-    const ranges = alignPieces(text, ["Apt", "#", "4", "#", "5"]);
+    const ranges = alignPieces("Apt # 4 # 5", ["Apt", "#", "4", "#", "5"]);
     assert.deepEqual(
       ranges.map((r) => r?.start),
       [0, 4, 6, 8, 10],
@@ -37,21 +39,14 @@ describe("alignPieces", () => {
   });
 
   it("widens a match over edge punctuation the piece has, not over commas", () => {
-    const text = "12 Main St., #5, P.O. Box 9";
-    const ranges = alignPieces(text, ["12", "main st.", "#5", "p.o. box 9"]);
     assert.deepEqual(
-      ranges.map((r) => r && text.slice(r.start, r.end)),
+      aligned("12 Main St., #5, P.O. Box 9", ["12", "main st.", "#5", "p.o. box 9"]),
       ["12", "Main St.", "#5", "P.O. Box 9"],
     );
   });
 
   it("does not widen over punctuation that belongs to the next piece", () => {
-    const text = "Apt#4";
-    const ranges = alignPieces(text, ["Apt", "#", "4"]);
-    assert.deepEqual(
-      ranges.map((r) => r && text.slice(r.start, r.end)),
-      ["Apt", "#", "4"],
-    );
+    assert.deepEqual(aligned("Apt#4", ["Apt", "#", "4"]), ["Apt", "#", "4"]);
   });
 
   it("returns undefined for a piece not found after the previous one", () => {

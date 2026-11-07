@@ -1,7 +1,8 @@
 /**
  * Trained-model cache shared by `pnpm eval` and the docs build: models/<impl>/<key>.bin, keyed
- * by the impl's source hash, training data hash (which covers the blend), seed and size, next to a <key>.train.json with
- * the training metrics and when, at which commit and on which machine they were measured.
+ * by the impl's source hash, training data hash (which covers the blend), seed and size, next to
+ * a <key>.train.json with the training metrics and when, at which commit and on which machine
+ * they were measured.
  * Also the child-process runner and the git/machine records that runs and the cache share.
  */
 import { spawn, spawnSync } from "node:child_process";
@@ -42,6 +43,10 @@ export function runChild<T>(task: Task, args: object, nodeFlags: string[] = []):
     });
   });
 }
+
+/** Trains in a fresh process, with heap room for the largest suites' training sets. */
+export const trainInChild = (args: TrainArgs) =>
+  runChild<Omit<Training, "cached" | "measured">>("train", args, ["--max-old-space-size=16384"]);
 
 export function gitInfo(): RunResult["git"] {
   const git = (...args: string[]) => spawnSync("git", ["-C", ROOT, ...args], { encoding: "utf8" });
@@ -98,11 +103,7 @@ export async function ensureModel(req: ModelRequest) {
   const measured = { at: new Date().toISOString(), git: gitInfo(), machine: machineInfo() };
   const result = {
     measured,
-    ...(await runChild<Omit<Training, "cached" | "measured">>(
-      "train",
-      { impl, split: "train", n, seed, weights, out: model } satisfies TrainArgs,
-      ["--max-old-space-size=16384"],
-    )),
+    ...(await trainInChild({ impl, split: "train", n, seed, weights, out: model })),
   };
   writeFileSync(metaPath, JSON.stringify(result, null, 2) + "\n");
   req.log(`  train done in ${((performance.now() - t0) / 1000).toFixed(1)}s`);

@@ -49,7 +49,7 @@ function walk(dir: string): string[] {
 function sourceFiles(name: string): string[] {
   const own = walk(implDir(name)).filter((p) => /\.(ts|py|lock)$/.test(p));
   const shared = walk(join(ROOT, "src")).filter(
-    (p) => p.endsWith(".ts") && !p.includes(`${join("src", "eval")}`),
+    (p) => p.endsWith(".ts") && !p.includes(join("src", "eval")),
   );
   return [...own, ...shared];
 }

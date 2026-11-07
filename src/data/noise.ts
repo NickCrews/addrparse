@@ -15,6 +15,7 @@
 import { createHash } from "node:crypto";
 import type { Label } from "../labels.ts";
 import type { Example, Span } from "../types.ts";
+import type { Rng } from "./datasets.ts";
 
 export const NOISE_NAMES = [
   /** "Apt 4, 123 Main St": the unit moves before the house number. */
@@ -62,7 +63,6 @@ export const NOISE_RATES: Readonly<Record<NoiseName, number>> = {
 
 /** Text with labeled pieces at odd indices and gaps (possibly empty) at even indices. */
 type Pieces = { text: string; label?: Label }[];
-type Rng = () => number;
 type Transform = (pieces: Pieces, rng: Rng) => Pieces | undefined;
 
 export function toPieces(text: string, spans: readonly Span[]): Pieces {

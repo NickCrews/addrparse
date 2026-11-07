@@ -55,14 +55,11 @@ export async function blendedLines(
       throw new Error(`dataset ${d} is not built; run \`pnpm data:build\``);
   }
   const order: { source: number; i: number }[] = [];
-  if (n > 0) {
-    for (const o of mixOrder(
-      names.map((d) => manifest.datasets[d]![split]),
-      names.map((d) => weights[d]!),
-    )) {
-      order.push(o);
-      if (order.length >= n) break;
-    }
+  const lengths = names.map((d) => manifest.datasets[d]![split]);
+  const shares = names.map((d) => weights[d]!);
+  for (const o of mixOrder(lengths, shares)) {
+    if (order.length >= n) break;
+    order.push(o);
   }
   if (order.length < n) {
     throw new Error(`${split} blend has only ${order.length} examples, ${n} requested`);

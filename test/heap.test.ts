@@ -15,7 +15,6 @@ test("counts collected garbage in allocated and retained memory in the peak", ()
   const weights = new Float64Array(2 * MB);
   const w = end();
   assert.ok(w.peakOverBaseline >= 16 * MB, `peak ${w.peakOverBaseline / MB} MB`);
-  assert.ok(w.allocated >= w.peakOverBaseline);
   assert.ok(w.allocated >= 2 * w.peakOverBaseline, `allocated ${w.allocated / MB} MB`);
   assert.equal(kept.length + weights.length, 100_000 + 2 * MB);
 });

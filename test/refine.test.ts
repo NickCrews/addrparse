@@ -12,13 +12,18 @@ import {
 import type { Label } from "../src/labels.ts";
 import { labeledTokens, spansFromTokens, tokenize } from "../src/tokens.ts";
 
-const road = (s: string) => refineRoad(s.split(" "), []);
-const roadNotes = (s: string) => {
+type Refiner = (tokens: readonly string[], notes: string[]) => Label[];
+/** A refiner applied to space-separated tokens, returning their labels. */
+const labelsOf = (refiner: Refiner) => (s: string) => refiner(s.split(" "), []);
+const road = labelsOf(refineRoad);
+const house = labelsOf(refineHouseNumber);
+const unit = labelsOf(refineOccupancy);
+const box = labelsOf(refinePoBox);
+const notesOf = (refiner: Refiner, s: string) => {
   const notes: string[] = [];
-  refineRoad(s.split(" "), notes);
+  refiner(s.split(" "), notes);
   return notes;
 };
-const unit = (s: string) => refineOccupancy(s.split(" "), []);
 
 /** Refines a libpostal tagged string, e.g. "12/house_number Main/road |/FSEP Kenai/city". */
 function run(tagged: string, fieldSeparator = ", "): RefineResult {
@@ -31,6 +36,12 @@ function ok(tagged: string, fieldSeparator = ", ") {
   const r = run(tagged, fieldSeparator);
   assert.ok(r.ok, `rejected: ${r.ok ? "" : r.reason}`);
   return r;
+}
+
+/** Why `tagged` is rejected, or undefined when it is accepted. */
+function rejected(tagged: string) {
+  const r = run(tagged);
+  return r.ok ? undefined : r.reason;
 }
 
 /** Each span's text and label. */
@@ -110,14 +121,13 @@ describe("refineRoad", () => {
   });
 
   it("labels a truncated suffix as the post-type and notes it", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineRoad(["West", "Morris", "Hill", "Ro"], notes), [
+    assert.deepEqual(road("West Morris Hill Ro"), [
       "StreetNamePreDirectional",
       "StreetName",
       "StreetName",
       "StreetNamePostType",
     ]);
-    assert.ok(notes.includes("road:truncated-suffix"));
+    assert.ok(notesOf(refineRoad, "West Morris Hill Ro").includes("road:truncated-suffix"));
   });
 
   it("keeps whole words that prefix a suffix as the name", () => {
@@ -125,21 +135,19 @@ describe("refineRoad", () => {
   });
 
   it("labels a lone word as the name and notes when it is a type or directional", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineRoad(["Broadway"], notes), ["StreetName"]);
-    assert.deepEqual(notes, []);
-    assert.deepEqual(refineRoad(["Boulevard"], notes), ["StreetName"]);
-    assert.deepEqual(notes, ["road:lone-type-or-directional"]);
+    assert.deepEqual(road("Broadway"), ["StreetName"]);
+    assert.deepEqual(notesOf(refineRoad, "Broadway"), []);
+    assert.deepEqual(road("Boulevard"), ["StreetName"]);
+    assert.deepEqual(notesOf(refineRoad, "Boulevard"), ["road:lone-type-or-directional"]);
   });
 
   it("labels libpostal's abbreviated directionals and notes them", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineRoad(["Wst", "Higgins", "Av"], notes), [
+    assert.deepEqual(road("Wst Higgins Av"), [
       "StreetNamePreDirectional",
       "StreetName",
       "StreetNamePostType",
     ]);
-    assert.ok(notes.includes("road:abbreviated-directional"));
+    assert.ok(notesOf(refineRoad, "Wst Higgins Av").includes("road:abbreviated-directional"));
     assert.deepEqual(road("14th Street Nthwst"), [
       "StreetName",
       "StreetNamePostType",
@@ -165,12 +173,12 @@ describe("refineRoad: ambiguous splits", () => {
       "StreetName",
       "StreetNamePostType",
     ]);
-    assert.ok(roadNotes("S West Temple St").includes("road:split-directional"));
+    assert.ok(notesOf(refineRoad, "S West Temple St").includes("road:split-directional"));
   });
 
   it("labels a road of two directionals as a pre-directional and a name, and notes it", () => {
     assert.deepEqual(road("E NRTH"), ["StreetNamePreDirectional", "StreetName"]);
-    assert.ok(roadNotes("E North").includes("road:directional-or-name"));
+    assert.ok(notesOf(refineRoad, "E North").includes("road:directional-or-name"));
   });
 
   it("labels Old before a pre-typed road as the pre-modifier", () => {
@@ -206,8 +214,8 @@ describe("refineRoad: ambiguous splits", () => {
 
   it("keeps a leading type in the name before a word and notes it", () => {
     assert.deepEqual(road("Calle Real"), ["StreetName", "StreetName"]);
-    assert.ok(roadNotes("Calle Real").includes("road:leading-type-in-name"));
-    assert.ok(roadNotes("Avenue of the Americas").includes("road:leading-type-in-name"));
+    assert.ok(notesOf(refineRoad, "Calle Real").includes("road:leading-type-in-name"));
+    assert.ok(notesOf(refineRoad, "Avenue of the Americas").includes("road:leading-type-in-name"));
   });
 
   it("labels a letter-digit route number as the name", () => {
@@ -233,8 +241,8 @@ describe("refineRoad: ambiguous splits", () => {
   it("labels only the last of stacked types as the post-type", () => {
     assert.deepEqual(road("Village Gn Dr"), ["StreetName", "StreetName", "StreetNamePostType"]);
     assert.deepEqual(road("Bay St Ext"), ["StreetName", "StreetName", "StreetNamePostType"]);
-    assert.ok(roadNotes("Bay St Ext").includes("road:stacked-type"));
-    assert.ok(!roadNotes("Mill Creek Rd").includes("road:stacked-type"));
+    assert.ok(notesOf(refineRoad, "Bay St Ext").includes("road:stacked-type"));
+    assert.ok(!notesOf(refineRoad, "Mill Creek Rd").includes("road:stacked-type"));
   });
 
   it("labels a directional after stacked types as the post-directional", () => {
@@ -248,93 +256,55 @@ describe("refineRoad: ambiguous splits", () => {
 
 describe("refineHouseNumber", () => {
   it("labels a separate letter or fraction after the number as the suffix", () => {
-    assert.deepEqual(refineHouseNumber(["1833", "B"], []), [
-      "AddressNumber",
-      "AddressNumberSuffix",
-    ]);
-    assert.deepEqual(refineHouseNumber(["5157", "1", "/", "2"], []), [
+    assert.deepEqual(house("1833 B"), ["AddressNumber", "AddressNumberSuffix"]);
+    assert.deepEqual(house("5157 1 / 2"), [
       "AddressNumber",
       "AddressNumberSuffix",
       "AddressNumberSuffix",
       "AddressNumberSuffix",
     ]);
-    assert.deepEqual(refineHouseNumber(["1203", "C2"], []), [
-      "AddressNumber",
-      "AddressNumberSuffix",
-    ]);
+    assert.deepEqual(house("1203 C2"), ["AddressNumber", "AddressNumberSuffix"]);
   });
 
   it("labels a unicode fraction as the suffix", () => {
-    assert.deepEqual(refineHouseNumber(["5218", "½"], []), [
-      "AddressNumber",
-      "AddressNumberSuffix",
-    ]);
+    assert.deepEqual(house("5218 ½"), ["AddressNumber", "AddressNumberSuffix"]);
   });
 
   it("labels N, S, E or W after the number as the road's pre-directional, and notes it", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineHouseNumber(["680", "E"], notes), [
-      "AddressNumber",
-      "StreetNamePreDirectional",
-    ]);
-    assert.deepEqual(notes, ["house_number:directional"]);
+    assert.deepEqual(house("680 E"), ["AddressNumber", "StreetNamePreDirectional"]);
+    assert.deepEqual(notesOf(refineHouseNumber, "680 E"), ["house_number:directional"]);
   });
 
   it("keeps attached suffixes, ranges and words in the number", () => {
-    assert.deepEqual(refineHouseNumber(["193E"], []), ["AddressNumber"]);
-    assert.deepEqual(
-      refineHouseNumber(["125", "/", "127"], []),
-      new Array(3).fill("AddressNumber"),
-    );
-    assert.deepEqual(refineHouseNumber(["Nº", "3033"], []), ["AddressNumber", "AddressNumber"]);
-    assert.deepEqual(refineHouseNumber(["404", "Rear"], []), ["AddressNumber", "AddressNumber"]);
+    assert.deepEqual(house("193E"), ["AddressNumber"]);
+    assert.deepEqual(house("125 / 127"), new Array(3).fill("AddressNumber"));
+    assert.deepEqual(house("Nº 3033"), ["AddressNumber", "AddressNumber"]);
+    assert.deepEqual(house("404 Rear"), ["AddressNumber", "AddressNumber"]);
   });
 });
 
 describe("refineOccupancy", () => {
   it("labels leading designators as type and the rest as identifier", () => {
-    assert.deepEqual(refineOccupancy(["Apt", "#", "4B"], []), [
-      "OccupancyType",
-      "OccupancyType",
-      "OccupancyIdentifier",
-    ]);
+    assert.deepEqual(unit("Apt # 4B"), ["OccupancyType", "OccupancyType", "OccupancyIdentifier"]);
   });
 
   it("accepts libpostal's abbreviations as designators", () => {
-    assert.deepEqual(refineOccupancy(["Aptmnt", "12"], []), [
-      "OccupancyType",
-      "OccupancyIdentifier",
-    ]);
+    assert.deepEqual(unit("Aptmnt 12"), ["OccupancyType", "OccupancyIdentifier"]);
   });
 
   it("infers an unknown leading word as a designator and notes it", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineOccupancy(["Casa", "9"], notes), [
-      "OccupancyType",
-      "OccupancyIdentifier",
-    ]);
-    assert.deepEqual(notes, ["unit:inferred-type"]);
+    assert.deepEqual(unit("Casa 9"), ["OccupancyType", "OccupancyIdentifier"]);
+    assert.deepEqual(notesOf(refineOccupancy, "Casa 9"), ["unit:inferred-type"]);
   });
 
   it("labels a level word after the identifier as type", () => {
-    assert.deepEqual(refineOccupancy(["3rd", "Floor"], []), [
-      "OccupancyIdentifier",
-      "OccupancyType",
-    ]);
-    assert.deepEqual(refineOccupancy(["Ground", "Floor"], []), [
-      "OccupancyIdentifier",
-      "OccupancyType",
-    ]);
+    assert.deepEqual(unit("3rd Floor"), ["OccupancyIdentifier", "OccupancyType"]);
+    assert.deepEqual(unit("Ground Floor"), ["OccupancyIdentifier", "OccupancyType"]);
   });
 
   it("splits Hong Kong floor notation into identifier and type, and notes it", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineOccupancy(["9", "/", "F"], notes), [
-      "OccupancyIdentifier",
-      "OccupancyType",
-      "OccupancyType",
-    ]);
-    assert.deepEqual(notes, ["unit:slash-level"]);
+    assert.deepEqual(unit("9 / F"), ["OccupancyIdentifier", "OccupancyType", "OccupancyType"]);
+    assert.deepEqual(notesOf(refineOccupancy, "9 / F"), ["unit:slash-level"]);
     assert.deepEqual(unit("G / F"), ["OccupancyIdentifier", "OccupancyType", "OccupancyType"]);
     assert.deepEqual(unit("Gd / Fl"), ["OccupancyIdentifier", "OccupancyType", "OccupancyType"]);
   });
@@ -360,15 +330,14 @@ describe("refineOccupancy", () => {
   });
 
   it("notes a unit with no designator", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refineOccupancy(["12"], notes), ["OccupancyIdentifier"]);
-    assert.deepEqual(notes, ["unit:no-type"]);
+    assert.deepEqual(unit("12"), ["OccupancyIdentifier"]);
+    assert.deepEqual(notesOf(refineOccupancy, "12"), ["unit:no-type"]);
   });
 });
 
 describe("refinePoBox", () => {
   it("splits the designator from the number", () => {
-    assert.deepEqual(refinePoBox(["P.O.", "Box", "#", "12", "B"], []), [
+    assert.deepEqual(box("P.O. Box # 12 B"), [
       "USPSBoxType",
       "USPSBoxType",
       "USPSBoxType",
@@ -378,31 +347,21 @@ describe("refinePoBox", () => {
   });
 
   it("keeps single-letter designator words as type", () => {
-    assert.deepEqual(refinePoBox(["P", "O", "B", "889"], []), [
-      "USPSBoxType",
-      "USPSBoxType",
-      "USPSBoxType",
-      "USPSBoxID",
-    ]);
+    assert.deepEqual(box("P O B 889"), ["USPSBoxType", "USPSBoxType", "USPSBoxType", "USPSBoxID"]);
   });
 
   it("takes a final letter as the ID when there is no number", () => {
-    assert.deepEqual(refinePoBox(["P", "O", "B", "A"], []), [
-      "USPSBoxType",
-      "USPSBoxType",
-      "USPSBoxType",
-      "USPSBoxID",
-    ]);
+    assert.deepEqual(box("P O B A"), ["USPSBoxType", "USPSBoxType", "USPSBoxType", "USPSBoxID"]);
   });
 
   it("splits a box on a route into route and box", () => {
-    assert.deepEqual(refinePoBox(["RR", "2", "Box", "5A"], []), [
+    assert.deepEqual(box("RR 2 Box 5A"), [
       "USPSBoxGroupType",
       "USPSBoxGroupID",
       "USPSBoxType",
       "USPSBoxID",
     ]);
-    assert.deepEqual(refinePoBox(["Rural", "Route", "2,", "Box", "#", "5"], []), [
+    assert.deepEqual(box("Rural Route 2, Box # 5"), [
       "USPSBoxGroupType",
       "USPSBoxGroupType",
       "USPSBoxGroupID",
@@ -413,9 +372,8 @@ describe("refinePoBox", () => {
   });
 
   it("notes a box with no ID", () => {
-    const notes: string[] = [];
-    assert.deepEqual(refinePoBox(["P.O.", "Box"], notes), ["USPSBoxType", "USPSBoxType"]);
-    assert.deepEqual(notes, ["po_box:no-id"]);
+    assert.deepEqual(box("P.O. Box"), ["USPSBoxType", "USPSBoxType"]);
+    assert.deepEqual(notesOf(refinePoBox, "P.O. Box"), ["po_box:no-id"]);
   });
 });
 
@@ -499,10 +457,10 @@ describe("refine", () => {
   });
 
   it("rejects venue names tagged as the city", () => {
-    const r = run(
-      "12/house_number Main/road |/FSEP Comfort/city Inn/city Fruita/city ,/SEP CO/state",
+    assert.equal(
+      rejected("12/house_number Main/road |/FSEP Comfort/city Inn/city Fruita/city ,/SEP CO/state"),
+      "venue-as-city",
     );
-    assert.deepEqual(r.ok ? undefined : r.reason, "venue-as-city");
     assert.ok(ok("Fountain/city Inn/city ,/SEP SC/state").ok);
   });
 
@@ -531,25 +489,21 @@ describe("refine", () => {
   });
 
   it("rejects placeholder roads", () => {
-    const r = run("0/house_number UNKNOWN/road |/FSEP Kenai/city");
-    assert.deepEqual(r.ok ? undefined : r.reason, "placeholder-road");
+    assert.equal(rejected("0/house_number UNKNOWN/road |/FSEP Kenai/city"), "placeholder-road");
     assert.equal(run("NO/road SITUS/road").ok, false);
   });
 
   it("rejects non-Latin text in kept fields but not in dropped ones", () => {
-    const r = run("Kenai/city ,/SEP アラスカ/state 州/state");
-    assert.deepEqual(r.ok ? undefined : r.reason, "non-latin-script");
+    assert.equal(rejected("Kenai/city ,/SEP アラスカ/state 州/state"), "non-latin-script");
     assert.equal(ok("Kenai/city ,/SEP ケナイ/state_district ,/SEP AK/state").text, "Kenai, AK");
   });
 
   it("rejects an example with nothing left", () => {
-    const r = run("Hotel/house");
-    assert.deepEqual(r.ok ? undefined : r.reason, "empty");
+    assert.equal(rejected("Hotel/house"), "empty");
   });
 
   it("rejects unknown libpostal labels", () => {
-    const r = run("x/mystery");
-    assert.deepEqual(r.ok ? undefined : r.reason, "unknown-label:mystery");
+    assert.equal(rejected("x/mystery"), "unknown-label:mystery");
   });
 
   it("notes translated state and country names", () => {

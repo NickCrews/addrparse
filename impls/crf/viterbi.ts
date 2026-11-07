@@ -9,13 +9,29 @@
  */
 export const transIndex = (L: number, from: number, to: number) => to * (L + 1) + from;
 
+/** Index of the transition into token i of an n-token state sequence (i = n is the end). */
+export const pathTransIndex = (L: number, path: ArrayLike<number>, n: number, i: number) =>
+  transIndex(L, i === 0 ? L : path[i - 1]!, i === n ? L : path[i]!);
+
+/**
+ * Allowed transitions as source lists: the allowed sources of target y (y = L is the end) are
+ * `src[srcPtr[y] .. srcPtr[y + 1]]`, and `startOk[y]` says whether y may start a sequence.
+ */
+export function allowedSources(L: number, allowed: Uint8Array) {
+  const src: number[] = [];
+  const srcPtr = new Int32Array(L + 2);
+  for (let y = 0; y <= L; y++) {
+    for (let x = 0; x < L; x++) if (allowed[transIndex(L, x, y)]) src.push(x);
+    srcPtr[y + 1] = src.length;
+  }
+  const startOk = Uint8Array.from({ length: L }, (_, y) => allowed[transIndex(L, L, y)]!);
+  return { src: Int32Array.from(src), srcPtr, startOk };
+}
+
 export class Viterbi {
   readonly L: number;
   private readonly trans: Float64Array;
-  /** Allowed sources of target y (y = L is the end) are `src[srcPtr[y] .. srcPtr[y + 1]]`. */
-  private readonly src: Int32Array;
-  private readonly srcPtr: Int32Array;
-  private readonly startOk: Uint8Array;
+  private readonly sources: ReturnType<typeof allowedSources>;
   private score = new Float64Array(0);
   private back = new Int32Array(0);
 
@@ -23,14 +39,7 @@ export class Viterbi {
   constructor(L: number, trans: Float64Array, allowed: Uint8Array) {
     this.L = L;
     this.trans = trans;
-    const src: number[] = [];
-    this.srcPtr = new Int32Array(L + 2);
-    for (let y = 0; y <= L; y++) {
-      for (let x = 0; x < L; x++) if (allowed[transIndex(L, x, y)]) src.push(x);
-      this.srcPtr[y + 1] = src.length;
-    }
-    this.src = Int32Array.from(src);
-    this.startOk = Uint8Array.from({ length: L }, (_, y) => allowed[transIndex(L, L, y)]!);
+    this.sources = allowedSources(L, allowed);
   }
 
   /** Writes the best state sequence into `out` and returns its score. */
@@ -41,14 +50,11 @@ export class Viterbi {
       this.score = new Float64Array(n * L * 2);
       this.back = new Int32Array(n * L * 2);
     }
-    const score = this.score;
-    const back = this.back;
-    const trans = this.trans;
-    const src = this.src;
-    const srcPtr = this.srcPtr;
+    const { score, back, trans } = this;
+    const { src, srcPtr, startOk } = this.sources;
     const T = L + 1;
     for (let y = 0; y < L; y++) {
-      score[y] = this.startOk[y] ? trans[y * T + L]! + emit[y]! : -Infinity;
+      score[y] = startOk[y] ? trans[y * T + L]! + emit[y]! : -Infinity;
     }
     for (let i = 1; i < n; i++) {
       const prev = (i - 1) * L;

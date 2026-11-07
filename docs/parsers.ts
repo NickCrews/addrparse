@@ -27,7 +27,7 @@ function fromBase64(s: string): Uint8Array {
   return out;
 }
 
-export async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
+async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
   const stream = new Blob([bytes as Uint8Array<ArrayBuffer>])
     .stream()
     .pipeThrough(new DecompressionStream("gzip"));

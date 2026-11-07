@@ -1,20 +1,15 @@
-/**
- * Forward-backward for a linear chain over the allowed transitions, in probability space with
- * per-token scaling. Training uses the marginals for the gradient; the parser uses log Z for the
- * probability of its Viterbi path.
- */
-import { transIndex } from "./viterbi.ts";
+import { allowedSources } from "./viterbi.ts";
 
 /**
- * Marginals of a linear chain, computed in probability space with per-token scaling.
- * After `run`, `node[i * L + y]` is P(y_i = y) and `logZ` the log partition function.
+ * Forward-backward for a linear chain over the allowed transitions, in probability space with
+ * per-token scaling. After `run`, `node[i * L + y]` is P(y_i = y) and `logZ` the log partition
+ * function. Training uses the marginals for the gradient; the parser uses `forward`'s log Z for
+ * the probability of its Viterbi path.
  */
 export class ForwardBackward {
   readonly L: number;
-  /** Allowed sources of target y (y = L is the end) are `src[srcPtr[y] .. srcPtr[y + 1]]`. */
-  readonly src: Int32Array;
-  readonly srcPtr: Int32Array;
-  readonly startOk: Uint8Array;
+  readonly sources: ReturnType<typeof allowedSources>;
+  private readonly allowed: Uint8Array;
   /** exp(transition score), 0 where disallowed; indexed like `trans`. */
   readonly expTrans: Float64Array;
   node = new Float64Array(0);
@@ -26,31 +21,15 @@ export class ForwardBackward {
 
   constructor(L: number, allowed: Uint8Array) {
     this.L = L;
-    const src: number[] = [];
-    this.srcPtr = new Int32Array(L + 2);
-    for (let y = 0; y <= L; y++) {
-      for (let x = 0; x < L; x++) if (allowed[transIndex(L, x, y)]) src.push(x);
-      this.srcPtr[y + 1] = src.length;
-    }
-    this.src = Int32Array.from(src);
-    this.startOk = Uint8Array.from({ length: L }, (_, y) => allowed[transIndex(L, L, y)]!);
+    this.sources = allowedSources(L, allowed);
+    this.allowed = allowed;
     this.expTrans = new Float64Array((L + 1) * (L + 1));
   }
 
   /** Recomputes `expTrans` from transition scores; call after the scores change. */
   setTransitions(trans: Float64Array): void {
-    const L = this.L;
-    this.expTrans.fill(0);
-    for (let y = 0; y <= L; y++) {
-      for (let j = this.srcPtr[y]!; j < this.srcPtr[y + 1]!; j++) {
-        const t = transIndex(L, this.src[j]!, y);
-        this.expTrans[t] = Math.exp(trans[t]!);
-      }
-      if (y < L && this.startOk[y]) {
-        const t = transIndex(L, L, y);
-        this.expTrans[t] = Math.exp(trans[t]!);
-      }
-    }
+    const { allowed, expTrans } = this;
+    for (let t = 0; t < expTrans.length; t++) expTrans[t] = allowed[t] ? Math.exp(trans[t]!) : 0;
   }
 
   /** Fills `node` with marginals and sets `logZ`. */
@@ -70,7 +49,8 @@ export class ForwardBackward {
       this.expEmit = new Float64Array(m);
       this.scale = new Float64Array(n * 2);
     }
-    const { alpha, expEmit, scale, expTrans, src, srcPtr } = this;
+    const { alpha, expEmit, scale, expTrans } = this;
+    const { src, srcPtr } = this.sources;
     const T = L + 1;
     let logZ = 0;
     for (let i = 0; i < n; i++) {
@@ -114,7 +94,8 @@ export class ForwardBackward {
 
   private backward(n: number, zEnd: number): void {
     const L = this.L;
-    const { alpha, beta, expEmit, scale, expTrans, src, srcPtr, node } = this;
+    const { alpha, beta, expEmit, scale, expTrans, node } = this;
+    const { src, srcPtr } = this.sources;
     const T = L + 1;
     const last = (n - 1) * L;
     for (let x = 0; x < L; x++) beta[last + x] = expTrans[L * T + x]! / zEnd;

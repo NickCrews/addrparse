@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -219,8 +219,7 @@ describe("generated datasets", () => {
 });
 
 describe("datasets/README.md", () => {
-  it("exists, for people adding a dataset", async () => {
-    const { existsSync } = await import("node:fs");
+  it("exists, for people adding a dataset", () => {
     assert.ok(existsSync(join(ROOT, "datasets", "README.md")));
   });
 });

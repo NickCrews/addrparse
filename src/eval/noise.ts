@@ -3,15 +3,15 @@
  *
  *   pnpm noise <impl...> [--suite quick] [--last 5]
  *
- * Uses the last `--last` saved runs of each impl in the suite (dev split) that share the latest
- * run's code, data, suite config and machine, so the only difference between them is chance. Runs made while
- * the machine was busy (load average above its core count) are skipped, as `pnpm eval` already
- * flags their timings as unreliable. Make them with
- * e.g. `for i in 1 2 3 4 5 6; do pnpm eval lookup --retrain; done` (`--retrain` so training is
- * measured each time). For every ordered pair of those runs it takes the relative change
- * |b − a| / |a|, as `pnpm eval` would show it, and prints the 90th percentile and the maximum.
- * A 90th percentile above the metric's noise (red) means more than one in ten repeat runs
- * would be coloured as a real change.
+ * Uses the last `--last` saved dev-split runs of each impl in the suite that share the latest
+ * run's code, data, suite config and machine, so they differ only by chance. Runs made while the
+ * machine was busy (load average above its core count) are skipped, as `pnpm eval` already flags
+ * their timings as unreliable. Make them with e.g.
+ * `for i in 1 2 3 4 5 6; do pnpm eval lookup --retrain; done` (`--retrain` so training is measured
+ * each time). For every ordered pair of those runs it takes the relative change |b − a| / |a|, as
+ * `pnpm eval` would show it, and prints the 90th percentile and the maximum. A 90th percentile
+ * above the metric's noise (red) means more than one in ten repeat runs would be coloured as a
+ * real change.
  */
 import { parseArgs } from "node:util";
 import { HEADLINE } from "./headline.ts";

@@ -49,12 +49,7 @@ const MIN_CITY_COUNT = { zip: 3, state: 10 };
 
 const LONG_SUFFIXES = [...STREET_SUFFIXES].filter((s) => s.length >= 4);
 
-const DIRECTIONAL_WORDS: Record<string, string> = {
-  n: "north",
-  s: "south",
-  e: "east",
-  w: "west",
-};
+const DIRECTIONAL_WORDS: Record<string, string> = { n: "north", s: "south", e: "east", w: "west" };
 
 /** True when `a` and `b` differ by one insertion, deletion, substitution or adjacent swap. */
 export function oneEditApart(a: string, b: string): boolean {
@@ -135,8 +130,7 @@ export class GoldIndex {
   }
 
   private bucket(area: string, name: string): string | undefined {
-    if (!name) return undefined;
-    return `${area}|${name.split(" ").length}|${name[0]}`;
+    return name ? `${area}|${name.split(" ").length}|${name[0]}` : undefined;
   }
 
   /** True when `w` mostly ends street names, as a misspelled type would. */

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Label } from "../src/labels.ts";
 import { labelAt, labeledTokens, spansFromTokens, tokenize } from "../src/tokens.ts";
+import { example, pairs } from "./helpers.ts";
 
 const cores = (text: string) => tokenize(text).map((t) => text.slice(t.coreStart, t.coreEnd));
 
@@ -45,15 +46,10 @@ describe("labelAt", () => {
 
 describe("labeledTokens", () => {
   it("pairs each token's core text with its gold label", () => {
-    const ex = {
-      id: "x",
-      source: "test",
-      text: "Kenai, AK",
-      spans: [
-        { start: 0, end: 5, label: "PlaceName" as const },
-        { start: 7, end: 9, label: "StateName" as const },
-      ],
-    };
+    const ex = example("Kenai, AK", [
+      ["Kenai", "PlaceName"],
+      ["AK", "StateName"],
+    ]);
     assert.deepEqual(
       labeledTokens(ex).map((t) => [t.text, t.label]),
       [
@@ -66,7 +62,7 @@ describe("labeledTokens", () => {
 
 describe("spansFromTokens", () => {
   const spans = (text: string, labels: (Label | undefined)[]) =>
-    spansFromTokens(tokenize(text), labels).map((s) => [text.slice(s.start, s.end), s.label]);
+    pairs(text, spansFromTokens(tokenize(text), labels));
 
   it("merges adjacent tokens with the same label", () => {
     assert.deepEqual(spans("New York NY", ["PlaceName", "PlaceName", "StateName"]), [

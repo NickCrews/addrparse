@@ -4,9 +4,10 @@
  */
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Label } from "../labels.ts";
 import { mergeAdjacent } from "./accuracy.ts";
-import type { Span } from "../types.ts";
+import type { ReferenceImpl, ReferencePrediction, Span } from "../types.ts";
 
 /**
  * Runs `command`, writes each input as one JSON string per line to its stdin, and returns one
@@ -165,4 +166,25 @@ export function collectPredictions<T>(
     spans.push(s.spans);
   });
   return { spans, parseErrors, firstError, unaligned };
+}
+
+/**
+ * `ReferenceImpl.predict` for a parser run by `dir/predict.py`, a uv script locked in
+ * `dir/predict.py.lock` that reads JSON-string lines and writes one parse per line. `info` gets
+ * the locked package versions, then `extraInfo`, then the unaligned piece count.
+ */
+export async function predictWithUv<T>(
+  name: string,
+  dir: string,
+  texts: readonly string[],
+  ctx: Parameters<ReferenceImpl["predict"]>[1],
+  toSpans: (text: string, parse: T) => { spans: Span[]; unaligned: number },
+  { env, extraInfo }: { env?: NodeJS.ProcessEnv; extraInfo?: Record<string, string> } = {},
+): Promise<ReferencePrediction> {
+  ctx.log(`  ${name}: parsing ${texts.length.toLocaleString("en-US")} texts in Python`);
+  const args = ["run", "--quiet", "--locked", "--script", "predict.py"];
+  const out = await runJsonLines("uv", args, texts, { cwd: dir, env });
+  const { unaligned, ...prediction } = collectPredictions(texts, out, toSpans);
+  const versions = lockedVersions(join(dir, "predict.py.lock"));
+  return { ...prediction, info: { ...versions, ...extraInfo, unaligned } };
 }
