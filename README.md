@@ -192,7 +192,7 @@ their id and are only compared with other test runs.
 
 ## CI
 
-`.github/workflows/ci.yml` runs `pnpm check` and then the `ci` suite for every impl on
+`.github/workflows/ci.yml` runs `pnpm check` and then the `ci` suite for every trained impl (not the reference impls) on
 `test/fixtures/data/`, a few hundred committed examples. `eval`, `errors` and `data:build` read and write the
 splits in `$ADDRPARSE_DATA_DIR` instead of `data/` when that is set (downloads stay in `data/raw/`):
 

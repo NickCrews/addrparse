@@ -23,7 +23,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      - name: ci suite for every impl on the fixture data
+      # Reference impls (impls/*/predict.py) need Python and libpostal, so CI skips them.
+      - name: ci suite for every trained impl on the fixture data
         env:
           ADDRPARSE_DATA_DIR: test/fixtures/data
-        run: pnpm eval $(ls impls/*/index.ts | cut -d/ -f2) --suite ci
+        run: pnpm eval $(for d in impls/*/; do [ -e "$d/predict.py" ] || basename "$d"; done) --suite ci
