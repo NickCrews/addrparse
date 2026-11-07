@@ -1,0 +1,112 @@
+# addrparse
+
+An eval harness for US address parsers written in pure TypeScript. An implementation in
+`impls/<name>/` trains on labeled addresses and parses text into labeled spans (`AddressNumber`,
+`StreetName`, `PlaceName`, …; see `src/labels.ts`). The harness measures accuracy, speed, memory,
+model size and training cost, saves every run, and compares runs, so implementations can be
+improved one measured change at a time.
+
+Requires Node 24+ (TypeScript runs directly via type stripping).
+
+## Quickstart
+
+```sh
+pnpm install
+pnpm data                          # download libpostal training data, build data/{train,dev,test}.jsonl
+pnpm eval lookup --suite smoke     # train + measure the lookup baseline, print results
+pnpm compare                       # latest run of every impl, side by side
+```
+
+## Commands
+
+| command                                     | does                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| `pnpm eval <impl...> [--suite quick]`       | train (or reuse cached model), measure, save, print vs previous run |
+| `  --split test`                            | score on the test split instead of dev                              |
+| `  --only accuracy,memory,latency,...`      | run a subset of steps (`throughput`, `determinism`, `curve`)        |
+| `  --retrain`                               | ignore the model cache                                              |
+| `pnpm compare [--suite quick] [--detail]`   | latest run per impl; best value per metric highlighted              |
+| `pnpm compare <impl>`                       | that impl's last two runs, with changes                             |
+| `pnpm compare <runA> <runB>`                | two runs (id, id prefix, impl name, or path)                        |
+| `pnpm errors <run> [--label X] [--slice s]` | misparsed examples as token / gold / predicted tables               |
+
+`--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
+or red only when larger than the metric's noise threshold; smaller ones are dimmed.
+
+## Adding an implementation
+
+Create `impls/<name>/index.ts` that default-exports an `Impl` (`src/types.ts`):
+
+```ts
+const impl: Impl = {
+  train(examples, ctx) {
+    return { model: bytes, info: { features: 123 } };
+  },
+  load(bytes) {
+    return { parse: (text) => spans };
+  },
+};
+export default impl;
+```
+
+Training and inference run in separate processes and share only the model bytes, so
+serialization, size and load cost are part of what is measured. `src/tokens.ts` has a whitespace
+tokenizer and `spansFromTokens` for token-level models; `impls/lookup` uses them. `impls/noop`
+returns nothing: its timings and memory are the harness's own floor.
+
+## Metrics
+
+Every measurement runs in a fresh `node --expose-gc` process (`src/eval/child.ts`), so JIT state
+and heap from one measurement don't affect another.
+
+| metric                    | how it's measured                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| exact match               | share of eval examples whose predicted span set equals gold. The headline number.                   |
+| token accuracy            | share of whitespace tokens whose label matches gold                                                 |
+| span P/R/F1               | a span counts only if start, end and label all match; also per label                                |
+| slices                    | exact match on subsets (`src/eval/slices.ts`), e.g. PO boxes, all-caps, OSM                         |
+| latency p50/p99, µs/token | one thread, after warmup passes; each `parse` call timed individually                               |
+| throughput/s              | N worker threads, each with its own model, parsing back to back for a fixed time; median of repeats |
+| model size, gzip          | bytes returned by `train`, raw and gzip -9                                                          |
+| model load ms             | wall time of `load(bytes)`                                                                          |
+| model heap                | heap used after `load`, minus before (both after GC)                                                |
+| infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                            |
+| train seconds, examples/s | wall time of `train()`, excluding data loading                                                      |
+| train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                         |
+| determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                       |
+| learning curve            | exact match after training on fewer examples (`full` suite)                                         |
+| code lines                | lines of `impls/<name>/**/*.ts`                                                                     |
+
+Memory caveats: the "over baseline" peaks are sampled every millisecond by a worker thread, so
+spikes shorter than that can be missed. The run JSON also has `peakRssMB`, the OS's maxRSS; that
+covers the whole process lifetime, so it includes Node startup and loading the data,
+and is only meaningful when the model dominates.
+
+## Runs, cache and history
+
+- `results/runs/<runId>.json`: everything a run measured, plus suite config, git sha/dirty, data
+  hashes, implementation source hash and machine. Committed, so history stays comparable.
+- `results/predictions/<runId>.jsonl`: per-example predictions, read by `pnpm errors`. Not committed.
+- `models/<impl>/<key>.bin`: trained models. The key hashes the impl's sources plus shared `src/`
+  (not `src/eval/`), the training data, seed and size, so any change that could change the model
+  retrains it. A cached model reuses the training metrics from when it was trained;
+  `--retrain` measures training again.
+
+A run is compared against the previous run of the same impl, suite and split. Runs from different
+suites, data or machines aren't comparable; `compare` prints a note when they differ.
+
+## Where to tweak
+
+| file                   | controls                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `eval.config.ts`       | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve |
+| `src/eval/headline.ts` | which metrics the tables show, their order, format and noise thresholds                        |
+| `src/eval/slices.ts`   | accuracy subsets                                                                               |
+| `src/data/refine.ts`   | how libpostal's labels map to the output labels                                                |
+| `src/labels.ts`        | the label set                                                                                  |
+
+## Dev vs test
+
+Hill-climb on `dev` (the default). Score on `test` with `--split test` only occasionally, e.g.
+before writing up a result, so it stays an unbiased estimate. Test runs get a `-test` suffix in
+their id and are only compared with other test runs.
