@@ -39,6 +39,8 @@ html {
 }
 body {
   margin: 0;
+  /* the playground is wider than main; clip keeps the header sticky, unlike hidden */
+  overflow-x: clip;
   background: var(--bg);
   color: var(--fg);
   font:
@@ -196,10 +198,6 @@ mark.lab[data-label="NotAddress"] {
   background: var(--panel);
   outline: 1px dashed var(--muted);
 }
-.parsed {
-  font-size: 1.1rem;
-  line-height: 2;
-}
 .metric-names code {
   margin-right: 6px;
   white-space: nowrap;
@@ -243,19 +241,6 @@ article.model {
   padding-left: 20px;
   margin: 4px 0;
 }
-.pg-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-.pg-controls select {
-  width: 100%;
-}
-.field {
-  display: grid;
-  gap: 2px;
-  font-weight: 600;
-}
 select,
 textarea,
 button {
@@ -275,43 +260,47 @@ button {
   cursor: pointer;
   background: var(--panel);
 }
-.pg-row {
+.pg-buttons {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.pg-buttons button {
+  font-size: 0.85rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.pg-buttons button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+.pg-row {
+  display: flex;
   align-items: center;
   gap: 6px 18px;
 }
-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+.pg-row .pg-buttons {
+  flex: 1;
 }
-legend {
-  font-weight: 600;
-  float: left;
-  margin-right: 10px;
+.pg-row > button,
+#pg-status {
+  flex: none;
 }
-.check {
-  overflow-wrap: anywhere;
+/* The playground spans the window, not main's 1040px column. */
+.pg-bleed {
+  width: calc(100vw - 32px);
+  margin-left: calc(50% - 50vw + 16px);
 }
-#pg-demo-desc {
-  margin: 0;
+.pg-wrap {
+  max-width: none;
 }
 table.pg {
   font-size: 0.85rem;
 }
 table.pg tbody {
   border-top: 2px solid var(--line);
-}
-table.pg tr.input td {
-  background: var(--panel);
-  border-bottom: 0;
-}
-table.pg tr.gold {
-  font-style: italic;
 }
 table.pg th[scope="row"] {
   font-weight: 500;
@@ -321,19 +310,49 @@ table.pg th[scope="row"] {
 table.pg td {
   white-space: nowrap;
 }
-.linkish {
-  background: none;
-  border: 0;
-  padding: 0;
-  text-align: left;
-  color: var(--fg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  word-break: break-word;
+table.pg td.pg-in {
+  background: var(--panel);
+  min-width: 20em;
+  max-width: 32em;
+  white-space: normal;
 }
-.linkish:hover {
-  text-decoration: underline;
+.pg-edit {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 1.55em;
+  outline: none;
+}
+.pg-edit:focus {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-radius: 3px;
+}
+.pg-edit:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+}
+table.pg td.pg-ner {
+  line-height: 2.3;
+}
+mark.ent {
+  background: hsl(var(--h, 0) var(--lab-s) var(--lab-l));
+  color: inherit;
+  border-radius: 0.35em;
+  padding: 0.2em 0.45em;
+  margin: 0 0.15em;
+  line-height: 1;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+mark.ent[data-label="NotAddress"] {
+  background: var(--panel);
+  outline: 1px dashed var(--muted);
+}
+.ent-label {
+  font-size: 0.7em;
+  font-weight: 700;
+  margin-left: 0.45em;
+  vertical-align: middle;
 }
 .cell-ok {
   background: var(--ok-bg);
@@ -351,31 +370,6 @@ table.pg td {
 .bad {
   color: var(--bad);
   font-weight: 700;
-}
-.pg-detail {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 14px;
-  margin: 10px 0;
-  background: var(--panel);
-}
-.pg-detail-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.pg-detail dl {
-  margin: 6px 0;
-}
-.pg-detail dt {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-top: 6px;
-}
-.pg-detail dd {
-  margin: 0;
-  line-height: 1.9;
-  overflow-wrap: anywhere;
 }
 footer {
   max-width: 1040px;

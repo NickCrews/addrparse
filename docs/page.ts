@@ -1,15 +1,14 @@
 /**
  * Renders the page's static HTML at build time: the Home, Metrics and Models tabs and the
- * playground's skeleton (docs/app.ts makes it interactive). Every number comes from the run
+ * playground's skeleton on Home (docs/app.ts makes it interactive). Every number comes from the run
  * files, data/stats.json or a parse made during the build.
  */
 import { LABELS, LABEL_NAMES, type Label } from "../src/labels.ts";
 import { TARGET_EXACT_MATCH } from "../src/eval/accuracy.ts";
 import { HEADLINE, type Metric } from "../src/eval/headline.ts";
 import type { RunResult } from "../src/eval/results.ts";
-import type { Span } from "../src/types.ts";
 import { DATASET_WEIGHTS } from "../eval.config.ts";
-import { esc, spansHtml } from "./html.ts";
+import { esc } from "./html.ts";
 import { IMPL_NOTES } from "./impl-notes.ts";
 
 export interface DataStats {
@@ -54,12 +53,7 @@ export interface PageContext {
   stats?: DataStats;
   /** The model attribution paragraph from CONTRIBUTING.md, as plain text. */
   attribution: string;
-  example: {
-    text: string;
-    spans: Span[];
-    /** Span text → a note shown next to that span. */
-    notes: Record<string, string>;
-  };
+  /** Preset sets sampled from the dev split, and the distinct texts in them. */
   demo: { sets: number; rows: number };
   generated: { at: string; git: string };
 }
@@ -112,7 +106,6 @@ const fmt = (m: Metric, r: RunResult | undefined) => {
 // Home
 
 function home(ctx: PageContext): string {
-  const ex = ctx.example;
   const labelRows = LABEL_NAMES.map((l) => {
     const [meaning, example] = LABELS[l].split(/: (?=[^:]*$)/);
     return [`<mark class="lab" data-label="${l}">${l}</mark>`, esc(meaning!), esc(example ?? "")];
@@ -122,24 +115,7 @@ function home(ctx: PageContext): string {
 <h1>addrparse</h1>
 <p class="lede">Parse US addresses into labeled parts using pure typescript, with exceptional accurary and performance.</p>
 
-<h2 id="home-example">Example</h2>
-<pre class="input">${esc(ex.text)}</pre>
-<p>is parsed to a sequence of tokens:</p>
-<p class="parsed">${spansHtml(ex.text, ex.spans)}</p>
-${table(
-  ["label", "text", "start", "end", "note"],
-  ex.spans.map((s) => {
-    const text = ex.text.slice(s.start, s.end);
-    return [
-      `<mark class="lab" data-label="${s.label}">${s.label}</mark>`,
-      esc(text),
-      String(s.start),
-      String(s.end),
-      esc(ex.notes[text] ?? ""),
-    ];
-  }),
-  { align: ["l", "l", "r", "r", "l"] },
-)}
+${playground(ctx)}
 
 <h2 id="home-goals">What</h2>
 ${list([
@@ -552,32 +528,17 @@ ${size ? `<p class="dim">Embedded model: ${kb(size.bytes)} (${kb(size.gzipBytes)
 }
 
 function playground(ctx: PageContext): string {
+  const impl = Object.keys(ctx.embedded)[0] ?? "crf";
   return `
-<h2 id="models-playground">Playground</h2>
-<p>Paste addresses, one per line. ${Object.keys(ctx.embedded).map(code).join(" and ")} run in this page
-with the embedded models. The Python references can't run here; their columns are filled only for demo
-rows, from their eval run.</p>
-<div class="pg-controls">
-  <label class="field">Demo set
-    <select id="pg-demo"><option value="">(your own text)</option></select>
-  </label>
-  <p id="pg-demo-desc" class="dim"></p>
-  <textarea id="pg-input" rows="8" wrap="off" spellcheck="false" placeholder="One address per line"></textarea>
-  <div class="pg-row">
-    <fieldset id="pg-models"><legend>Models</legend></fieldset>
-    <label class="check"><input type="checkbox" id="pg-empty"> show empty label columns</label>
-    <label class="check"><input type="checkbox" id="pg-diff"> only rows where models disagree</label>
-  </div>
-  <div class="pg-row">
-    <button id="pg-copy" type="button">Copy as TSV</button>
-    <span id="pg-status" class="dim" role="status"></span>
-  </div>
+<div class="pg-bleed">
+<h2 id="home-playground">Try it</h2>
+<div class="pg-row">
+  <div id="pg-presets" class="pg-buttons"></div>
+  <span id="pg-status" class="dim" role="status"></span>
+  <button id="pg-copy" type="button">Copy as TSV</button>
 </div>
-<p class="dim">Demo sets are ${ctx.demo.sets} seeded samples (${ctx.demo.rows} rows) from the dev split, picked
-by running the models at build time. Their gold labels have the noise described under Metrics → Gold
-labels, so a cell marked wrong may be right.</p>
-<div id="pg-detail" class="pg-detail" hidden></div>
-<div class="table-wrap pg-wrap"><table id="pg-table" class="pg"></table></div>`;
+<div class="table-wrap pg-wrap"><table id="pg-table" class="pg"></table></div>
+</div>`;
 }
 
 function modelsTab(ctx: PageContext): string {
@@ -586,7 +547,6 @@ function modelsTab(ctx: PageContext): string {
   return `
 <section id="tab-models" class="tab" data-tab="models">
 <h1>Models</h1>
-<p><a href="#models/playground">Jump to the playground</a></p>
 <h2 id="models-compare">Comparison</h2>
 <p>Latest ${code(ctx.suite)} run of each parser on the dev split. Best value per row in bold; ↓ means
 lower is better. A dash means not measured (references are measured for accuracy only).</p>
@@ -596,7 +556,6 @@ ${detail(ctx)}
 
 <h2 id="models-each">Parsers</h2>
 ${impls.map((i) => modelCard(ctx, i)).join("\n")}
-${playground(ctx)}
 </section>`;
 }
 
@@ -619,7 +578,7 @@ export function renderPage(ctx: PageContext, assets: { css: string; js: string; 
   <nav>
     <a href="#home" data-nav="home">Home</a>
     <a href="#metrics" data-nav="metrics">Metrics</a>
-    <a href="#models" data-nav="models">Models &amp; playground</a>
+    <a href="#models" data-nav="models">Models</a>
   </nav>
 </header>
 <main>

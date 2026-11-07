@@ -5,13 +5,11 @@
  * measures as the browser bundle.
  */
 import { load as loadCrf } from "../impls/crf/load.ts";
-import { load as loadLookup } from "../impls/lookup/load.ts";
 import type { Parser } from "../src/types.ts";
 
 /** Implementations whose parser runs in the page. */
 export const LOADERS: Record<string, (bytes: Uint8Array) => Parser> = {
   crf: loadCrf,
-  lookup: loadLookup,
 };
 
 export interface EmbeddedModel {

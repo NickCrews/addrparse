@@ -7,8 +7,8 @@
  *
  * Models come from the eval harness's cache (src/eval/models.ts) for the suite's training size
  * and seed, and are trained first when missing, so the page is reproducible from this command.
- * Metrics are the latest run of each impl for the suite on the dev split. Demo rows come from
- * the dev split only.
+ * Metrics are the latest run of each impl for the suite on the dev split. Playground rows are
+ * handpicked (docs/examples.ts) or from the dev split, never test.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -17,28 +17,19 @@ import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
 import { SUITES, type SuiteName } from "../eval.config.ts";
 import { defaultWeights, hashSplit, loadExamples } from "../src/data/load.ts";
-import { DATA_STATS_PATH, PREDICTIONS_DIR, ROOT } from "../src/data/paths.ts";
-import { scoreExample } from "../src/eval/accuracy.ts";
+import { DATA_STATS_PATH, ROOT } from "../src/data/paths.ts";
 import { implSourceHash, listImpls } from "../src/eval/impl.ts";
 import { ensureModel, gitInfo } from "../src/eval/models.ts";
 import { loadRuns, trainBlendOf, type RunResult } from "../src/eval/results.ts";
 import { LABEL_NAMES } from "../src/labels.ts";
 import { asScoredParse, type ScoredParse, type Span } from "../src/types.ts";
 import { readAttribution } from "./attribution.ts";
-import { pickDemo, type ModelPredictions } from "./demo.ts";
+import { pickDemo } from "./demo.ts";
+import { TOPICS } from "./examples.ts";
 import type { PageData } from "./page-data.ts";
 import { renderPage, type DataStats, type PageContext } from "./page.ts";
 import { LOADERS } from "./parsers.ts";
 
-/** Parsed on the Home tab. Written for the page, not taken from the data. */
-const EXAMPLE_TEXT = "CO John SMITH, 123 E St elias stree S,   Oklahoma City, OK 99507-1234";
-/** Notes on the Home tab example, by span text; shown only when the span has that text. */
-const EXAMPLE_NOTES: Record<string, string> = {
-  "CO John SMITH": "the recipient isn't part of the address",
-  "St elias": '"St" isn\'t mistaken for Street',
-  stree: "the typo is still the street type",
-  "Oklahoma City": '"Oklahoma" isn\'t mistaken for the state',
-};
 /** Impls the page leaves out; noop is the harness's floor, not a parser. */
 const SKIP = new Set(["noop"]);
 
@@ -74,7 +65,8 @@ const runNotes: Record<string, string[]> = {};
 const note = (impl: string, s: string) => (runNotes[impl] ??= []).push(s);
 
 // Models that run in the page: train or reuse the harness's cached model, then parse the eval set.
-const predictions: ModelPredictions[] = [];
+/** Parses of the dev eval set by each in-page model; the playground uses the first. */
+const predictions: { impl: string; spans: Span[][] }[] = [];
 const embedded: PageData["embedded"] = [];
 const embeddedSizes: PageContext["embedded"] = {};
 const parsers: Record<string, (text: string) => ScoredParse> = {};
@@ -99,7 +91,6 @@ for (const impl of Object.keys(LOADERS)) {
   predictions.push({
     impl,
     spans: examples.map((ex) => parsers[impl]!(ex.text).spans),
-    inPage: true,
   });
   const run = latest.get(impl);
   if (run && (run.implHash !== implHash || run.data.trainHash !== m.trainHash)) {
@@ -107,23 +98,9 @@ for (const impl of Object.keys(LOADERS)) {
   }
 }
 
-// References' predictions come from the run's saved predictions file, when it is of this eval set.
 for (const [impl, run] of latest) {
   if (run.data.evalHash !== evalHash)
     note(impl, "scored on a different dev set than the current one");
-  if (!run.metrics.reference) continue;
-  const path = join(PREDICTIONS_DIR, `${run.runId}.jsonl`);
-  if (!existsSync(path) || run.data.evalHash !== evalHash) {
-    log(`${impl}: no predictions for the current eval set; left out of the demo rows`);
-    continue;
-  }
-  const byId = new Map<string, Span[]>();
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    if (!line) continue;
-    const p = JSON.parse(line) as { id: string; spans: Span[] };
-    byId.set(p.id, p.spans);
-  }
-  predictions.push({ impl, spans: examples.map((ex) => byId.get(ex.id) ?? []), inPage: false });
 }
 
 // Display order: trained impls by exact match, then references by exact match.
@@ -132,14 +109,16 @@ const runs = [...latest.values()].sort(
   (a, b) =>
     Number(!!a.metrics.reference) - Number(!!b.metrics.reference) || exactOf(b) - exactOf(a),
 );
-const inPageExact = (p: ModelPredictions) =>
-  examples.filter((ex, i) => scoreExample(ex, p.spans[i]!).exact).length;
-const best = predictions
-  .filter((p) => p.inPage)
-  .sort((a, b) => inPageExact(b) - inPageExact(a))[0]?.impl;
-if (!best) throw new Error(`no in-page model among ${impls.join(", ")}`);
-
-const demo = pickDemo(examples, predictions, best, config.seed);
+const shown = predictions[0];
+if (!shown) throw new Error(`no in-page model among ${impls.join(", ")}`);
+const demo = pickDemo(
+  examples,
+  shown.spans,
+  shown.impl,
+  (t) => parsers[shown.impl]!(t).spans,
+  TOPICS,
+  config.seed,
+);
 log(`demo: ${demo.sets.length} sets, ${Object.keys(demo.rows).length} rows`);
 
 const stats = existsSync(DATA_STATS_PATH)
@@ -158,7 +137,6 @@ const ctx: PageContext = {
   embedded: embeddedSizes,
   stats,
   attribution: readAttribution(),
-  example: { text: EXAMPLE_TEXT, spans: parsers[best]!(EXAMPLE_TEXT).spans, notes: EXAMPLE_NOTES },
   demo: { sets: demo.sets.length, rows: Object.keys(demo.rows).length },
   generated: {
     at: new Date().toISOString().slice(0, 10),
@@ -166,16 +144,7 @@ const ctx: PageContext = {
   },
 };
 
-const order = [...runs.map((r) => r.impl), ...Object.keys(LOADERS)];
-const pageData: PageData = {
-  labels: LABEL_NAMES,
-  models: [...new Set(order)]
-    .filter((i) => impls.includes(i))
-    .filter((i) => i in parsers || predictions.some((p) => p.impl === i))
-    .map((impl) => ({ impl, inPage: impl in parsers })),
-  embedded,
-  demo,
-};
+const pageData: PageData = { labels: LABEL_NAMES, embedded, demo };
 
 const bundled = await build({
   entryPoints: [join(ROOT, "docs", "app.ts")],

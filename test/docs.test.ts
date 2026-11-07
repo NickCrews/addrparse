@@ -32,7 +32,7 @@ test("docs build makes one page whose embedded models parse demo rows as the bui
 
     const json = /<script id="page-data" type="application\/json">(.*?)<\/script>/s.exec(html);
     const data = JSON.parse(json![1]!) as PageData;
-    assert.deepEqual(data.embedded.map((m) => m.impl).sort(), ["crf", "lookup"]);
+    assert.deepEqual(data.embedded.map((m) => m.impl).sort(), ["crf"]);
     assert.ok(data.demo.sets.length > 0);
 
     for (const m of data.embedded) {

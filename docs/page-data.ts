@@ -4,25 +4,20 @@ import type { EmbeddedModel } from "./parsers.ts";
 
 export interface DemoSet {
   id: string;
-  /** Dropdown group, e.g. "Slices". */
-  group: string;
   title: string;
-  description: string;
   texts: string[];
 }
 
 export interface DemoRow {
   gold: Span[];
-  /** Whether each model's parse equals gold, as `pnpm eval` scores it. */
+  /** Whether each in-page model's parse equals gold, as `pnpm eval` scores it. */
   exact: Record<string, boolean>;
-  /** Parses of models that can't run in the page (the Python references), from their eval run. */
-  spans: Record<string, Span[]>;
 }
 
 export interface PageData {
   labels: string[];
-  /** Every model the playground offers, in display order. */
-  models: { impl: string; inPage: boolean }[];
+  /** The playground parses with the first one. */
   embedded: EmbeddedModel[];
+  /** Presets in dropdown order; the first is loaded when the page opens. */
   demo: { sets: DemoSet[]; rows: Record<string, DemoRow> };
 }

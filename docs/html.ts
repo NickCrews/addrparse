@@ -7,15 +7,18 @@ export const esc = (s: string) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
   );
 
-/** `text` with each span wrapped in a `<mark>` that the stylesheet colors by label. */
-export function spansHtml(text: string, spans: readonly Span[]): string {
+/**
+ * `text` with each span as a box holding its text and label, in the style of spaCy's displaCy
+ * entity view. The stylesheet colors each box by label.
+ */
+export function entsHtml(text: string, spans: readonly Span[]): string {
   let out = "";
   let at = 0;
   for (const s of [...spans].sort((a, b) => a.start - b.start)) {
     out += esc(text.slice(at, s.start));
     out +=
-      `<mark class="lab" data-label="${s.label}" title="${s.label}">` +
-      `${esc(text.slice(s.start, s.end))}</mark>`;
+      `<mark class="ent" data-label="${s.label}">${esc(text.slice(s.start, s.end))}` +
+      `<span class="ent-label">${s.label}</span></mark>`;
     at = s.end;
   }
   return out + esc(text.slice(at));
