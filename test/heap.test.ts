@@ -7,9 +7,10 @@ const MB = 1024 * 1024;
 test("counts collected garbage in allocated and retained memory in the peak", () => {
   const end = startHeapWindow();
   const kept: string[] = [];
-  for (let i = 0; i < 1_000_000; i++) {
+  // Far more garbage than a young generation holds, so collections run inside the window.
+  for (let i = 0; i < 5_000_000; i++) {
     const s = `garbage ${i}`;
-    if (i % 10 === 0) kept.push(s);
+    if (i % 50 === 0) kept.push(s);
   }
   const weights = new Float64Array(2 * MB);
   const w = end();
