@@ -5,7 +5,8 @@ export const ROOT = join(import.meta.dirname, "..", "..");
 export const DATA_DIR = process.env.ADDRPARSE_DATA_DIR
   ? resolve(process.env.ADDRPARSE_DATA_DIR)
   : join(ROOT, "data");
-export const RAW_DIR = join(DATA_DIR, "raw");
+/** Downloaded sources; always data/raw, since only the splits are swapped out for fixtures. */
+export const RAW_DIR = join(ROOT, "data", "raw");
 export const MODELS_DIR = join(ROOT, "models");
 export const RESULTS_DIR = join(ROOT, "results");
 export const RUNS_DIR = join(RESULTS_DIR, "runs");

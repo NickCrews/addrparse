@@ -323,6 +323,7 @@ for (const impl of impls) {
     const r = await evalImpl(impl, evalExamples, evalHash);
     done.push(r);
     if (r.run.metrics.accuracy?.parseErrors) failed = true;
+    if (r.run.metrics.determinism?.identical === false) failed = true;
   } catch (e) {
     failed = true;
     log(c.red(`  ${impl} failed: ${e instanceof Error ? e.message : String(e)}`));

@@ -1,7 +1,7 @@
 /**
- * Writes test/fixtures/data/{train,dev,test}.jsonl: the first examples of each split in data/,
- * as many as the `ci` suite uses. The fixture is committed so CI can run every impl without
- * downloading the training data.
+ * Writes test/fixtures/data/{train,dev,test}.jsonl: the first examples of each split in data/ (or
+ * `$ADDRPARSE_DATA_DIR`), as many as the `ci` suite uses. The fixture is committed so CI can run
+ * every impl without downloading the training data.
  *
  *   node src/data/fixture.ts
  */

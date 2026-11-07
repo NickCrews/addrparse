@@ -26,4 +26,4 @@ jobs:
       - name: ci suite for every impl on the fixture data
         env:
           ADDRPARSE_DATA_DIR: test/fixtures/data
-        run: pnpm eval $(ls impls) --suite ci
+        run: pnpm eval $(ls impls/*/index.ts | cut -d/ -f2) --suite ci

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
+import { SUITES } from "../eval.config.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -23,10 +25,22 @@ describe("DATA_DIR", () => {
   it("is data/ by default", () => {
     assert.equal(dataDir({}), join(ROOT, "data", "dev.jsonl"));
   });
-  it("is ADDRPARSE_DATA_DIR, resolved against the working directory, when set", () => {
+  it("is ADDRPARSE_DATA_DIR when set", () => {
     assert.equal(
       dataDir({ ADDRPARSE_DATA_DIR: "test/fixtures/data" }),
       resolve(ROOT, "test/fixtures/data/dev.jsonl"),
     );
+  });
+});
+
+describe("test/fixtures/data", () => {
+  const lines = (split: string) =>
+    readFileSync(join(ROOT, "test/fixtures/data", `${split}.jsonl`), "utf8")
+      .split("\n")
+      .filter(Boolean).length;
+  it("holds exactly as many examples as the ci suite uses", () => {
+    assert.equal(lines("train"), SUITES.ci.trainExamples);
+    assert.equal(lines("dev"), SUITES.ci.evalExamples);
+    assert.equal(lines("test"), SUITES.ci.evalExamples);
   });
 });
