@@ -1,0 +1,56 @@
+name: pages
+
+# Builds the user docs (`pnpm docs`, the full suite) and publishes them to GitHub Pages.
+# The page embeds models trained on ODbL data; it carries the attribution, and building from a
+# pushed commit of main gives it the source link ODbL §4.6 asks for (CONTRIBUTING.md "Data and
+# licenses").
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Streams libpostal's training data from archive.org and builds data/.
+      - run: pnpm data
+      # Trains the in-page models for the full suite (a few minutes), then writes docs/dist/.
+      # Reference parsers' demo columns need results/predictions/, which is gitignored, so the
+      # page built here has none.
+      - run: pnpm docs --suite full
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
