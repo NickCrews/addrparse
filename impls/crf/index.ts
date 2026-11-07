@@ -14,7 +14,12 @@ import { decode, encode } from "./model.ts";
 import { trainPerceptron } from "./perceptron.ts";
 
 const TRAINER = "crf" as "crf" | "perceptron";
-const MIN_COUNT = 2;
+/**
+ * Features seen fewer times than this in training are left out. On the full suite, 10 instead of
+ * 2 gives the same exact match (98.07% vs 98.08%) with a 27% smaller model (380 KB vs 517 KB
+ * gzipped); parse speed is the same, since the dropped features are rare words.
+ */
+const MIN_COUNT = 10;
 
 const CRF = { epochs: 10, eta0: 0.1, decay: 0.8, l1: 0.2, minWeight: 0.001 };
 /** Averaged perceptron weights count updates, so pruning works on a different scale. */
