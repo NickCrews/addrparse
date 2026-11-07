@@ -40,7 +40,11 @@ export const NOISE_NAMES = [
   "dot-joined",
   /** "123 Main St,Kenai,AK": no space after commas. */
   "comma-joined",
-  /** One deleted, transposed, doubled or keyboard-adjacent letter in a street, city or unit word. */
+  /**
+   * One or two deleted, transposed, doubled, keyboard-replaced or keyboard-inserted letters in a
+   * word of 4+ letters in any span. Shorter words are left alone: a typo in "N" or "St" makes a
+   * different word.
+   */
   "typo",
   /** The whole text lowercased. */
   "lowercase",
@@ -69,7 +73,7 @@ export const NOISE_RATES: Readonly<Record<NoiseName, number>> = {
   "extra-punct": 0.05,
   "dot-joined": 0.03,
   "comma-joined": 0.03,
-  typo: 0.04,
+  typo: 0.08,
   lowercase: 0.04,
   uppercase: 0.03,
 };
@@ -300,13 +304,6 @@ const dotJoined: Transform = (pieces, rng) => {
   return pieces;
 };
 
-const TYPO_LABELS: ReadonlySet<Label> = new Set([
-  "StreetName",
-  "StreetNamePostType",
-  "PlaceName",
-  "OccupancyType",
-]);
-
 const KEYBOARD_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 
 function keyboardNeighbor(ch: string, rng: Rng): string {
@@ -321,10 +318,29 @@ function keyboardNeighbor(ch: string, rng: Rng): string {
   throw new Error(`not an ASCII letter: ${ch}`);
 }
 
+/** Share of typos with a second edit in the same word ("Vermont" → "vermn"). */
+const SECOND_TYPO_RATE = 0.2;
+
+/**
+ * One deletion, transposition, doubling, keyboard-adjacent replacement or keyboard-adjacent
+ * insertion in `word`, never at its first letter: people rarely get that wrong.
+ */
+function editWord(word: string, rng: Rng): string {
+  const op = Math.floor(rng() * 5);
+  // A transposition needs a next letter.
+  const k = 1 + Math.floor(rng() * (word.length - (op === 1 ? 2 : 1)));
+  const head = word.slice(0, k);
+  if (op === 1 && word[k] !== word[k + 1]) return head + word[k + 1] + word[k] + word.slice(k + 2);
+  if (op === 0 || op === 1) return head + word.slice(k + 1);
+  if (op === 2) return head + word[k] + word.slice(k);
+  if (op === 3) return head + keyboardNeighbor(word[k]!, rng) + word.slice(k + 1);
+  return head + keyboardNeighbor(word[k]!, rng) + word.slice(k);
+}
+
 const typo: Transform = (pieces, rng) => {
   // Whole words of 4+ ASCII letters, as [piece index, word start, word end].
   const words: [number, number, number][] = [];
-  for (const i of labeledIndices(pieces, (l) => TYPO_LABELS.has(l))) {
+  for (const i of labeledIndices(pieces, () => true)) {
     for (const m of pieces[i]!.text.matchAll(/(?<!\p{L})[A-Za-z]{4,}(?!\p{L})/gu)) {
       words.push([i, m.index, m.index + m[0].length]);
     }
@@ -332,16 +348,11 @@ const typo: Transform = (pieces, rng) => {
   if (words.length === 0) return undefined;
   const [i, start, end] = words[Math.floor(rng() * words.length)]!;
   const s = pieces[i]!.text;
-  const op = Math.floor(rng() * 4);
-  // Not the first letter: people rarely get that wrong. A transposition needs a next letter.
-  const k = start + 1 + Math.floor(rng() * (end - start - (op === 1 ? 2 : 1)));
-  let out: string;
-  if (op === 1 && s[k] !== s[k + 1]) out = s.slice(0, k) + s[k + 1] + s[k] + s.slice(k + 2);
-  else if (op === 0 || op === 1) out = s.slice(0, k) + s.slice(k + 1);
-  else if (op === 2) out = s.slice(0, k) + s[k] + s.slice(k);
-  else out = s.slice(0, k) + keyboardNeighbor(s[k]!, rng) + s.slice(k + 1);
-  if (out === s) return undefined;
-  pieces[i] = { ...pieces[i]!, text: out };
+  const word = s.slice(start, end);
+  let edited = editWord(word, rng);
+  if (rng() < SECOND_TYPO_RATE && edited.length >= 4) edited = editWord(edited, rng);
+  if (edited === word) return undefined;
+  pieces[i] = { ...pieces[i]!, text: s.slice(0, start) + edited + s.slice(end) };
   return pieces;
 };
 

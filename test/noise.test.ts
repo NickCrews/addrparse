@@ -480,7 +480,7 @@ describe("noise property", () => {
             });
             assert.equal(out.spans.length, ex.spans.length);
             assert.equal(changed.length, 1);
-            assert.ok(Math.abs(out.text.length - ex.text.length) <= 1);
+            assert.ok(Math.abs(out.text.length - ex.text.length) <= 2);
             break;
           }
         }

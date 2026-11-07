@@ -102,7 +102,7 @@ The data is a custom blend from several different sources:
 
 Share is each dataset's weight in the training and eval sets. The shipped model is trained on the first 500,000 examples of the blend.
 Most synthetic examples end with the city, state and ZIP of a real libpostal address.
-Random formatting noise (case, punctuation, spacing) is added to the examples.
+Random formatting noise (case, punctuation, spacing, typos) is added to the examples.
 
 ## How it works and how it's measured
 
