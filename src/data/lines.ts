@@ -11,6 +11,7 @@ import { refine, type RefineResult } from "./refine.ts";
 
 const IDENTITY_LABELS: ReadonlySet<Label> = new Set([
   "AddressNumber",
+  "AddressNumberSuffix",
   "StreetName",
   "PlaceName",
   "ZipCode",
@@ -27,14 +28,21 @@ export function lineKey(line: string): string {
 }
 
 /**
- * The split of an example, from a hash of its address identity (number, street name, place, ZIP,
+ * The split of an example, from a hash of its address identity (number and suffix, street name, place, ZIP,
  * box number), not of the text, so two renderings of one address never straddle train and test.
  */
 export function splitFor(ex: Pick<Example, "text" | "spans">): Split {
-  const identity = ex.spans
-    .filter((s) => IDENTITY_LABELS.has(s.label))
-    .map((s) => ex.text.slice(s.start, s.end).toLowerCase())
-    .join("|");
+  // A number suffix joins its number with a space, so "1833 B" hashes the same whether or not
+  // the suffix is its own span.
+  const parts: string[] = [];
+  for (const s of ex.spans) {
+    if (!IDENTITY_LABELS.has(s.label)) continue;
+    const text = ex.text.slice(s.start, s.end).toLowerCase();
+    if (s.label === "AddressNumberSuffix" && parts.length > 0)
+      parts[parts.length - 1] += ` ${text}`;
+    else parts.push(text);
+  }
+  const identity = parts.join("|");
   const u = hashUnit(identity || ex.text.toLowerCase());
   return u < 0.9 ? "train" : u < 0.95 ? "dev" : "test";
 }
