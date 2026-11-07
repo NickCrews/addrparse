@@ -11,6 +11,12 @@ export interface Slice {
 
 const has = (label: string) => (ex: Example) => ex.spans.some((s) => s.label === label);
 const tokenCount = (ex: Example) => ex.text.split(/\s+/).filter(Boolean).length;
+/**
+ * True when the gold labels rest on a heuristic or flagged noise (`Example.notes`). Notes that a
+ * field was dropped, or that the labels were checked by hand, don't count.
+ */
+const heuristicGold = (ex: Example) =>
+  (ex.notes ?? []).some((n) => !n.startsWith("dropped:") && n !== "override");
 
 export const SLICES: readonly Slice[] = [
   { name: "source=openaddresses", test: (ex) => ex.source === "openaddresses" },
@@ -26,4 +32,6 @@ export const SLICES: readonly Slice[] = [
   { name: "all-caps", test: (ex) => /\p{L}/u.test(ex.text) && ex.text === ex.text.toUpperCase() },
   { name: "tokens<=3", test: (ex) => tokenCount(ex) <= 3 },
   { name: "tokens>=10", test: (ex) => tokenCount(ex) >= 10 },
+  { name: "gold=clean", test: (ex) => !heuristicGold(ex) },
+  { name: "gold=heuristic", test: heuristicGold },
 ];

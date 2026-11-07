@@ -6,6 +6,7 @@
     "data": "node src/data/fetch.ts && node src/data/build.ts",
     "data:fetch": "node src/data/fetch.ts",
     "data:build": "node src/data/build.ts",
+    "data:override": "node src/data/override.ts",
     "eval": "node src/eval/run.ts",
     "compare": "node src/eval/compare.ts",
     "errors": "node src/eval/errors.ts",
