@@ -24,9 +24,27 @@ export interface Example {
   noise?: string[];
 }
 
-/** A loaded model. `parse` must be synchronous and side-effect free. */
+/**
+ * A parse with the parser's confidence that it is exactly right. Only the ranking of
+ * confidences matters to the harness (higher = more confident), so a sequence probability,
+ * a margin or a heuristic score all work; a probability in [0, 1] makes thresholds readable.
+ */
+export interface ScoredParse {
+  spans: Span[];
+  confidence?: number;
+}
+
+/**
+ * A loaded model. `parse` must be synchronous and side-effect free. It returns either bare
+ * spans or a `ScoredParse`; returning confidences turns on the risk–coverage metrics.
+ */
 export interface Parser {
-  parse(text: string): Span[];
+  parse(text: string): Span[] | ScoredParse;
+}
+
+/** A `parse` return value as a `ScoredParse`. */
+export function asScoredParse(result: Span[] | ScoredParse): ScoredParse {
+  return Array.isArray(result) ? { spans: result } : result;
 }
 
 export interface TrainContext {

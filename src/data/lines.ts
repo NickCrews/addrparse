@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import type { Label } from "../labels.ts";
 import type { Example } from "../types.ts";
 import { parseLine } from "./libpostal.ts";
+import { junkSplitKey } from "./not-address.ts";
 import type { Split } from "./paths.ts";
 import { refine, type RefineResult } from "./refine.ts";
 
@@ -30,8 +31,9 @@ export function lineKey(line: string): string {
 /**
  * The split of an example, from a hash of its address identity (number and suffix, street name, place, ZIP,
  * box number), not of the text, so two renderings of one address never straddle train and test.
+ * Junk examples hash `junkSplitKey`, so variants of one name or phone number share a split.
  */
-export function splitFor(ex: Pick<Example, "text" | "spans">): Split {
+export function splitFor(ex: Pick<Example, "text" | "spans"> & { source?: string }): Split {
   // A number suffix joins its number with a space, so "1833 B" hashes the same whether or not
   // the suffix is its own span.
   const parts: string[] = [];
@@ -43,7 +45,8 @@ export function splitFor(ex: Pick<Example, "text" | "spans">): Split {
     else parts.push(text);
   }
   const identity = parts.join("|");
-  const u = hashUnit(identity || ex.text.toLowerCase());
+  const key = ex.source === "junk" ? junkSplitKey(ex.text) : identity || ex.text.toLowerCase();
+  const u = hashUnit(key);
   return u < 0.9 ? "train" : u < 0.95 ? "dev" : "test";
 }
 

@@ -3,6 +3,7 @@
  * Colour is plain ANSI, off when stdout is not a TTY or NO_COLOR is set.
  */
 import { LABEL_NAMES } from "../labels.ts";
+import { TARGET_EXACT_MATCH } from "./accuracy.ts";
 import { HEADLINE, type Metric } from "./headline.ts";
 import type { RunResult } from "./results.ts";
 import { SLICES } from "./slices.ts";
@@ -92,13 +93,16 @@ export function sideBySideTable(runs: readonly RunResult[], labels: readonly str
 
 const pct = (v: number | undefined) => (v === undefined ? c.dim("–") : `${(v * 100).toFixed(2)}%`);
 
-type Detail = "labels" | "slices" | "curve";
+type Detail = "labels" | "slices" | "confidence" | "curve";
 
-/** Per-label span F1, per-slice exact match and the learning curve, one column per run. */
+/**
+ * Per-label span F1, per-slice exact match, the confidence threshold for the target exact match
+ * and the learning curve, one column per run.
+ */
 export function detailTables(
   runs: readonly RunResult[],
   labels: readonly string[],
-  which: readonly Detail[] = ["labels", "slices", "curve"],
+  which: readonly Detail[] = ["labels", "slices", "confidence", "curve"],
 ): string {
   const out: string[] = [];
   const labelRows = LABEL_NAMES.filter((l) =>
@@ -122,6 +126,15 @@ export function detailTables(
   );
   if (which.includes("slices") && sliceRows.length) {
     out.push(renderTable(["exact match by slice", "examples", ...labels], sliceRows));
+  }
+
+  const scored = runs.map((r) => r.metrics.accuracy?.riskCoverage);
+  if (which.includes("confidence") && scored.some(Boolean)) {
+    const row = [
+      `confidence threshold @ ${TARGET_EXACT_MATCH * 100}% exact`,
+      ...scored.map((rc) => rc?.atTarget?.threshold.toPrecision(4) ?? c.dim("–")),
+    ];
+    out.push(renderTable(["confidence", ...labels], [row]));
   }
 
   const sizes = [

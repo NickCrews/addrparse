@@ -11,6 +11,9 @@ export interface Slice {
 }
 
 const has = (label: string) => (ex: Example) => ex.spans.some((s) => s.label === label);
+/** Every gold span is NotAddress: a parser should abstain on the whole text. */
+export const isJunkOnly = (ex: Example) =>
+  ex.spans.length > 0 && ex.spans.every((s) => s.label === "NotAddress");
 const tokenCount = (ex: Example) => ex.text.split(/\s+/).filter(Boolean).length;
 /**
  * True when the gold labels rest on a heuristic or flagged noise (`Example.notes`). Notes that a
@@ -29,6 +32,8 @@ export const SLICES: readonly Slice[] = [
   { name: "pre-type", test: has("StreetNamePreType") },
   { name: "post-directional", test: has("StreetNamePostDirectional") },
   { name: "not-address", test: has("NotAddress") },
+  { name: "junk-only", test: isJunkOnly },
+  { name: "embedded", test: (ex) => ex.source === "embedded" },
   { name: "no-commas", test: (ex) => !ex.text.includes(",") },
   { name: "all-caps", test: (ex) => /\p{L}/u.test(ex.text) && ex.text === ex.text.toUpperCase() },
   { name: "tokens<=3", test: (ex) => tokenCount(ex) <= 3 },

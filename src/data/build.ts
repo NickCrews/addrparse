@@ -11,8 +11,12 @@
  *   the line, so noise never moves an address across splits and builds stay deterministic. Both
  *   the clean and the noisy text count as seen for deduplication; an example whose noisy text was
  *   already seen is written clean instead.
+ * - Synthetic NotAddress examples (src/data/not-address.ts) are interleaved right after the
+ *   address example that seeded them, built from its text before noise. An embedded address is
+ *   split with its address; a junk text by `junkSplitKey`, so variants of one name or phone
+ *   number share a split.
  *
- *   node src/data/build.ts [--noise-scale 1]
+ *   node src/data/build.ts [--noise-scale 1] [--junk-rate 0.02] [--embedded-rate 0.02]
  *
  * `--noise-scale` multiplies every rate in NOISE_RATES; 0 builds clean data.
  */
@@ -37,18 +41,28 @@ import {
 import { LIBPOSTAL_FILES, LIBPOSTAL_SNAPSHOT, type LibpostalSource } from "./libpostal.ts";
 import { lineKey, refineLine, splitFor } from "./lines.ts";
 import { addNoise, NOISE_NAMES, NOISE_RATES, seededRng, type NoiseName } from "./noise.ts";
+import { NOT_ADDRESS_DEFAULTS, notAddressExamples, type NotAddressOptions } from "./not-address.ts";
 import { DATA_DIR, DATA_STATS_PATH, rawPath, splitPath, type Split } from "./paths.ts";
 
 const SPLITS: readonly Split[] = ["train", "dev", "test"];
 
 const { values: args } = parseArgs({
-  options: { "noise-scale": { type: "string", default: "1" } },
+  options: {
+    "noise-scale": { type: "string", default: "1" },
+    "junk-rate": { type: "string", default: String(NOT_ADDRESS_DEFAULTS.junkRate) },
+    "embedded-rate": { type: "string", default: String(NOT_ADDRESS_DEFAULTS.embeddedRate) },
+  },
 });
 const noiseScale = Number(args["noise-scale"]);
 if (!(noiseScale >= 0)) throw new Error(`--noise-scale must be a number >= 0`);
 const noiseRates = Object.fromEntries(
   NOISE_NAMES.map((n) => [n, Math.min(1, NOISE_RATES[n] * noiseScale)]),
 ) as Record<NoiseName, number>;
+const notAddress: NotAddressOptions = {
+  ...NOT_ADDRESS_DEFAULTS,
+  junkRate: Number(args["junk-rate"]),
+  embeddedRate: Number(args["embedded-rate"]),
+};
 
 const sources = (Object.keys(LIBPOSTAL_FILES) as LibpostalSource[]).filter((s) =>
   existsSync(rawPath(s)),
@@ -87,6 +101,7 @@ const outs = Object.fromEntries(SPLITS.map((s) => [s, createWriteStream(splitPat
 
 const stats = {
   libpostalSnapshot: LIBPOSTAL_SNAPSHOT,
+  notAddress,
   linesRead: 0,
   examples: 0,
   duplicates: 0,
@@ -119,6 +134,14 @@ const stats = {
   labels: {} as Record<string, number>,
 };
 const bump = (m: Record<string, number>, k: string) => (m[k] = (m[k] ?? 0) + 1);
+
+function write(ex: Example, split = splitFor(ex)) {
+  outs[split].write(JSON.stringify(ex) + "\n");
+  stats.examples++;
+  stats.bySplit[split]++;
+  bump(stats.bySource, ex.source);
+  for (const span of ex.spans) bump(stats.labels, span.label);
+}
 
 const seen = new Set<string>();
 for (const { line, source, i } of rawLines()) {
@@ -169,12 +192,16 @@ for (const { line, source, i } of rawLines()) {
   seen.add(ex.text);
   if (ex.noise) for (const n of ex.noise) bump(stats.noise.applied, n);
   else stats.noise.clean++;
-  outs[split].write(JSON.stringify(ex) + "\n");
-  stats.examples++;
+  write(ex, split);
   if (override) stats.overrides.examples++;
-  stats.bySplit[split]++;
-  bump(stats.bySource, source);
-  for (const span of ex.spans) bump(stats.labels, span.label);
+  for (const extra of notAddressExamples(clean, notAddress)) {
+    if (seen.has(extra.text)) {
+      stats.duplicates++;
+      continue;
+    }
+    seen.add(extra.text);
+    write(extra);
+  }
 }
 for (const o of overrides.values()) {
   if (overrideByText.get(o.text) !== o) console.warn(`stale override ${o.key}: ${o.text}`);

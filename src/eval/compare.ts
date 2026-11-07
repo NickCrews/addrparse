@@ -5,7 +5,8 @@
  *   pnpm compare <impl>           that impl's last two runs, with changes
  *   pnpm compare <runA> <runB>    two runs (id, id prefix, impl name or path), with changes
  *
- * `--detail` adds span F1 per label, exact match per slice and the learning curve.
+ * `--detail` adds span F1 per label, exact match per slice, the confidence threshold for 99%
+ * exact match and the learning curve.
  */
 import { parseArgs } from "node:util";
 import {
