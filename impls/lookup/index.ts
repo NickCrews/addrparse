@@ -1,6 +1,7 @@
 /**
  * Context-free baseline: each token gets the label it most often had in training (lowercased,
- * edge punctuation removed); unseen tokens get the most common label overall.
+ * edge punctuation removed); unseen tokens get the most common label overall. Confidence is the
+ * share of tokens seen in training.
  */
 import { isLabel, type Label } from "../../src/labels.ts";
 import { labeledTokens, spansFromTokens, tokenize } from "../../src/tokens.ts";
@@ -44,10 +45,16 @@ const impl: Impl = {
     return {
       parse(text) {
         const tokens = tokenize(text);
-        const labels = tokens.map(
-          (t) => table.get(key(text.slice(t.coreStart, t.coreEnd))) ?? model.fallback,
-        );
-        return spansFromTokens(tokens, labels);
+        let seen = 0;
+        const labels = tokens.map((t) => {
+          const label = table.get(key(text.slice(t.coreStart, t.coreEnd)));
+          if (label) seen++;
+          return label ?? model.fallback;
+        });
+        return {
+          spans: spansFromTokens(tokens, labels),
+          confidence: tokens.length ? seen / tokens.length : 0,
+        };
       },
     };
   },

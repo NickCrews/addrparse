@@ -5,6 +5,7 @@
  * `noise` is the relative change at or below which a difference is shown as unchanged. Timing
  * and memory numbers vary run to run on one machine, so a 3% latency change is not a signal.
  */
+import { TARGET_EXACT_MATCH } from "./accuracy.ts";
 import type { RunResult } from "./results.ts";
 
 export interface Metric {
@@ -48,6 +49,54 @@ export const HEADLINE: readonly Metric[] = [
     format: pct,
     points: true,
     get: (r) => r.metrics.accuracy?.span.f1,
+  },
+  ...[0.9, 0.8, 0.5].map((coverage): Metric => ({
+    name: `exact @ ${coverage * 100}% coverage`,
+    better: "higher",
+    noise: 0,
+    format: pct,
+    points: true,
+    get: (r) =>
+      r.metrics.accuracy?.riskCoverage?.exactAtCoverage.find((p) => p.coverage === coverage)
+        ?.exactMatch,
+  })),
+  {
+    name: "risk–coverage AURC",
+    better: "lower",
+    noise: 0,
+    format: pct,
+    points: true,
+    get: (r) => r.metrics.accuracy?.riskCoverage?.aurc,
+  },
+  {
+    name: `coverage @ ${TARGET_EXACT_MATCH * 100}% exact`,
+    better: "higher",
+    noise: 0,
+    format: pct,
+    points: true,
+    get: (r) => {
+      const rc = r.metrics.accuracy?.riskCoverage;
+      return rc ? (rc.atTarget?.coverage ?? 0) : undefined;
+    },
+  },
+  {
+    name: "junk abstained",
+    better: "higher",
+    noise: 0,
+    format: pct,
+    points: true,
+    get: (r) => {
+      const a = r.metrics.accuracy?.abstention;
+      return a?.junkExamples ? a.junkAbstained : undefined;
+    },
+  },
+  {
+    name: "addresses abstained",
+    better: "lower",
+    noise: 0,
+    format: pct,
+    points: true,
+    get: (r) => r.metrics.accuracy?.abstention?.addressAbstained,
   },
   {
     name: "latency p50 µs",

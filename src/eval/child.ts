@@ -9,7 +9,7 @@ import { Worker } from "node:worker_threads";
 import { gzipSync } from "node:zlib";
 import { loadExamples } from "../data/load.ts";
 import type { Split } from "../data/paths.ts";
-import type { Span } from "../types.ts";
+import { asScoredParse, type Span } from "../types.ts";
 import { importImpl } from "./impl.ts";
 import { startRssSampler } from "./rss-sampler.ts";
 import { MB, mean, median, percentile } from "./stats.ts";
@@ -82,13 +82,14 @@ async function predict(a: PredictArgs) {
   let firstError: string | undefined;
   for (const ex of examples) {
     let spans: Span[] = [];
+    let confidence: number | undefined;
     try {
-      spans = parser.parse(ex.text);
+      ({ spans, confidence } = asScoredParse(parser.parse(ex.text)));
     } catch (e) {
       errors++;
       firstError ??= `${ex.id}: ${String(e)}`;
     }
-    lines.push(JSON.stringify({ id: ex.id, spans }));
+    lines.push(JSON.stringify({ id: ex.id, spans, confidence }));
   }
   writeFileSync(a.out, lines.join("\n") + "\n");
   return { parseErrors: errors, firstError };
@@ -144,8 +145,9 @@ async function latency(a: LatencyArgs) {
   for (let i = 0; i < a.calls; i++) {
     const text = texts[i % texts.length]!;
     const t0 = process.hrtime.bigint();
-    sink += parser.parse(text).length;
+    const result = parser.parse(text);
     us[i] = Number(process.hrtime.bigint() - t0) / 1e3;
+    sink += asScoredParse(result).spans.length;
   }
   if (sink < 0) console.error(sink);
   const meanTokens = countTokens(texts) / texts.length;

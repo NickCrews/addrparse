@@ -11,11 +11,16 @@
  *   and identifier, see `unit-joined` in src/data/noise.ts), counts only its first span's label, so
  *   token accuracy can't see the second one; exact match and span F1 do.
  * - span precision/recall/F1: a predicted span counts only if start, end and label all match.
+ * - abstention: on junk-only examples (every gold span is NotAddress), the share where the
+ *   parser emits no other label; on all other examples, the share where it emits only
+ *   NotAddress or nothing, i.e. wrongly abstains.
+ * - riskCoverage: when every parse has a confidence, exact match among the most confident
+ *   examples. See `riskCoverage`.
  */
 import { LABEL_NAMES, type Label } from "../labels.ts";
 import { labelAt, tokenize } from "../tokens.ts";
 import type { Example, Span } from "../types.ts";
-import { SLICES } from "./slices.ts";
+import { isJunkOnly, SLICES } from "./slices.ts";
 
 export interface Prf {
   precision: number;
@@ -30,6 +35,34 @@ export interface SliceMetrics {
   spanF1: number;
 }
 
+export interface Abstention {
+  junkExamples: number;
+  /** Share of junk-only examples with no predicted span other than NotAddress. */
+  junkAbstained: number;
+  addressExamples: number;
+  /** Share of the other examples with no predicted span other than NotAddress. */
+  addressAbstained: number;
+}
+
+export interface RiskCoverage {
+  /** Exact match among the `coverage` share of examples with the highest confidence. */
+  exactAtCoverage: { coverage: number; exactMatch: number }[];
+  /**
+   * Area under the risk–coverage curve: mean, over k = 1..n, of the error rate among the k
+   * most confident examples. 0 is perfect; a confidence that ignores correctness scores
+   * about 1 − exact match.
+   */
+  aurc: number;
+  /**
+   * The lowest confidence threshold at which exact match among examples at or above it is at
+   * least `target`, and the share of examples kept. null when no threshold reaches it.
+   */
+  atTarget: { target: number; threshold: number; coverage: number } | null;
+}
+
+export const COVERAGES = [1, 0.9, 0.8, 0.5] as const;
+export const TARGET_EXACT_MATCH = 0.99;
+
 export interface AccuracyMetrics extends SliceMetrics {
   tokens: number;
   span: Prf;
@@ -39,6 +72,9 @@ export interface AccuracyMetrics extends SliceMetrics {
   slices: Record<string, SliceMetrics>;
   /** Examples whose predicted spans overlapped or fell outside the text. */
   invalidPredictions: number;
+  abstention: Abstention;
+  /** Present when the parser returned a finite confidence for every example. */
+  riskCoverage?: RiskCoverage;
 }
 
 export interface ExampleScore {
@@ -127,9 +163,78 @@ function aggregate(scores: readonly ExampleScore[]): SliceMetrics & { tokens: nu
   };
 }
 
+/**
+ * Risk–coverage summary of per-example correctness ranked by confidence. Examples with equal
+ * confidence can't be separated by any threshold, so where a coverage cut falls inside a tie,
+ * the tied examples count at their mean correctness (the expectation over tie orders).
+ */
+export function riskCoverage(
+  correct: readonly boolean[],
+  confidence: readonly number[],
+  coverages: readonly number[] = COVERAGES,
+  target = TARGET_EXACT_MATCH,
+): RiskCoverage {
+  const n = correct.length;
+  if (n === 0 || confidence.length !== n) throw new Error("need one confidence per example");
+  const order = [...correct.keys()].sort((a, b) => confidence[b]! - confidence[a]!);
+  // Tie groups in descending confidence: [confidence, size, correct count].
+  const groups: [number, number, number][] = [];
+  for (const i of order) {
+    const last = groups.at(-1);
+    if (last && last[0] === confidence[i]) {
+      last[1]++;
+      last[2] += correct[i] ? 1 : 0;
+    } else groups.push([confidence[i]!, 1, correct[i] ? 1 : 0]);
+  }
+  // expected[k] = expected number correct among the k most confident examples.
+  const expected = new Float64Array(n + 1);
+  let k = 0;
+  let atTarget: RiskCoverage["atTarget"] = null;
+  for (const [conf, size, right] of groups) {
+    for (let j = 1; j <= size; j++) expected[k + j] = expected[k]! + (j * right) / size;
+    k += size;
+    if (expected[k]! / k >= target) atTarget = { target, threshold: conf, coverage: k / n };
+  }
+  let risk = 0;
+  for (let j = 1; j <= n; j++) risk += 1 - expected[j]! / j;
+  return {
+    exactAtCoverage: coverages.map((coverage) => {
+      const m = Math.max(1, Math.round(coverage * n));
+      return { coverage, exactMatch: expected[m]! / m };
+    }),
+    aurc: risk / n,
+    atTarget,
+  };
+}
+
+function abstention(examples: readonly Example[], predictions: readonly (readonly Span[])[]) {
+  let junk = 0,
+    junkAbstained = 0,
+    address = 0,
+    addressAbstained = 0;
+  examples.forEach((ex, i) => {
+    const predicted = normalizeSpans(ex.text, predictions[i] ?? []);
+    const abstained = predicted.every((s) => s.label === "NotAddress");
+    if (isJunkOnly(ex)) {
+      junk++;
+      if (abstained) junkAbstained++;
+    } else {
+      address++;
+      if (abstained) addressAbstained++;
+    }
+  });
+  return {
+    junkExamples: junk,
+    junkAbstained: junk ? junkAbstained / junk : 0,
+    addressExamples: address,
+    addressAbstained: address ? addressAbstained / address : 0,
+  };
+}
+
 export function scoreAll(
   examples: readonly Example[],
   predictions: readonly (readonly Span[])[],
+  confidences: readonly (number | undefined)[] = [],
 ): AccuracyMetrics {
   const scores = examples.map((ex, i) => scoreExample(ex, predictions[i] ?? []));
 
@@ -186,5 +291,16 @@ export function scoreAll(
       }),
     slices,
     invalidPredictions: scores.filter((s) => !s.valid).length,
+    abstention: abstention(examples, predictions),
+    riskCoverage: allFinite(confidences, examples.length)
+      ? riskCoverage(
+          scores.map((s) => s.exact),
+          confidences,
+        )
+      : undefined,
   };
+}
+
+function allFinite(xs: readonly (number | undefined)[], n: number): xs is readonly number[] {
+  return n > 0 && xs.length === n && xs.every((x) => typeof x === "number" && Number.isFinite(x));
 }

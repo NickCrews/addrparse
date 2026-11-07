@@ -1,0 +1,388 @@
+{
+  "runId": "2026-11-06T19-02-33__noop__quick",
+  "timestamp": "2026-11-07T04:02:33.006Z",
+  "impl": "noop",
+  "suite": "quick",
+  "config": {
+    "split": "dev",
+    "trainExamples": 50000,
+    "evalExamples": 5000,
+    "seed": 1,
+    "latency": {
+      "warmupPasses": 2,
+      "calls": 100000
+    },
+    "throughput": {
+      "seconds": 2,
+      "repeats": 3,
+      "threads": [
+        1
+      ]
+    },
+    "determinism": false,
+    "learningCurve": []
+  },
+  "git": {
+    "sha": "4886f9b5b87eaa860d3c1648283dfa259bd66acb",
+    "dirty": false
+  },
+  "implHash": "abe5ee6efd7fd684",
+  "data": {
+    "trainHash": "3955caeca4cde6f0",
+    "evalHash": "ec969e2dceffa235"
+  },
+  "machine": {
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "memoryGB": 64,
+    "os": "darwin 25.6.0",
+    "node": "v26.12.1"
+  },
+  "metrics": {
+    "training": {
+      "seconds": 0.000025207996368408204,
+      "examplesPerSec": 1983497588.1963491,
+      "tokensPerSec": 11622026428.37416,
+      "peakRssMB": 181.484375,
+      "peakRssOverBaselineMB": 0.015625,
+      "baselineRssMB": 151.48685455322266,
+      "modelBytes": 0,
+      "info": {},
+      "cached": false
+    },
+    "code": {
+      "bytes": 337,
+      "lines": 13,
+      "files": 1
+    },
+    "accuracy": {
+      "examples": 5000,
+      "exactMatch": 0,
+      "tokenAccuracy": 0,
+      "spanF1": 0,
+      "tokens": 29525,
+      "span": {
+        "precision": 0,
+        "recall": 0,
+        "f1": 0
+      },
+      "perLabel": {
+        "AddressNumber": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 3461,
+          "predicted": 0
+        },
+        "StreetNamePreDirectional": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 882,
+          "predicted": 0
+        },
+        "StreetNamePreType": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 84,
+          "predicted": 0
+        },
+        "StreetName": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 3799,
+          "predicted": 0
+        },
+        "StreetNamePostType": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 3461,
+          "predicted": 0
+        },
+        "StreetNamePostDirectional": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 258,
+          "predicted": 0
+        },
+        "OccupancyType": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 746,
+          "predicted": 0
+        },
+        "OccupancyIdentifier": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 746,
+          "predicted": 0
+        },
+        "USPSBoxType": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 61,
+          "predicted": 0
+        },
+        "USPSBoxID": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 61,
+          "predicted": 0
+        },
+        "PlaceName": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 4030,
+          "predicted": 0
+        },
+        "StateName": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 4015,
+          "predicted": 0
+        },
+        "ZipCode": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 2707,
+          "predicted": 0
+        },
+        "CountryName": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 333,
+          "predicted": 0
+        },
+        "NotAddress": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "gold": 483,
+          "predicted": 0
+        }
+      },
+      "confusions": [
+        {
+          "gold": "PlaceName",
+          "predicted": "-",
+          "count": 5435
+        },
+        {
+          "gold": "StreetName",
+          "predicted": "-",
+          "count": 4696
+        },
+        {
+          "gold": "StateName",
+          "predicted": "-",
+          "count": 4403
+        },
+        {
+          "gold": "AddressNumber",
+          "predicted": "-",
+          "count": 3500
+        },
+        {
+          "gold": "StreetNamePostType",
+          "predicted": "-",
+          "count": 3461
+        },
+        {
+          "gold": "ZipCode",
+          "predicted": "-",
+          "count": 2708
+        },
+        {
+          "gold": "NotAddress",
+          "predicted": "-",
+          "count": 1075
+        },
+        {
+          "gold": "CountryName",
+          "predicted": "-",
+          "count": 994
+        },
+        {
+          "gold": "OccupancyType",
+          "predicted": "-",
+          "count": 963
+        },
+        {
+          "gold": "StreetNamePreDirectional",
+          "predicted": "-",
+          "count": 901
+        },
+        {
+          "gold": "OccupancyIdentifier",
+          "predicted": "-",
+          "count": 804
+        },
+        {
+          "gold": "StreetNamePostDirectional",
+          "predicted": "-",
+          "count": 266
+        },
+        {
+          "gold": "USPSBoxType",
+          "predicted": "-",
+          "count": 143
+        },
+        {
+          "gold": "StreetNamePreType",
+          "predicted": "-",
+          "count": 115
+        },
+        {
+          "gold": "USPSBoxID",
+          "predicted": "-",
+          "count": 61
+        }
+      ],
+      "slices": {
+        "source=openaddresses": {
+          "examples": 2660,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "source=osm": {
+          "examples": 2162,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "street-address": {
+          "examples": 3461,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "no-street": {
+          "examples": 1154,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "unit": {
+          "examples": 673,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "po-box": {
+          "examples": 61,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "pre-type": {
+          "examples": 84,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "post-directional": {
+          "examples": 258,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "not-address": {
+          "examples": 441,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "junk-only": {
+          "examples": 105,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "embedded": {
+          "examples": 88,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "no-commas": {
+          "examples": 734,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "all-caps": {
+          "examples": 1156,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "tokens<=3": {
+          "examples": 898,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        },
+        "tokens>=10": {
+          "examples": 277,
+          "exactMatch": 0,
+          "tokenAccuracy": 0,
+          "spanF1": 0
+        }
+      },
+      "invalidPredictions": 0,
+      "abstention": {
+        "junkExamples": 105,
+        "junkAbstained": 1,
+        "addressExamples": 4895,
+        "addressAbstained": 1
+      },
+      "parseErrors": 0
+    },
+    "memory": {
+      "modelBytes": 0,
+      "modelGzipBytes": 20,
+      "loadMs": 0.021667003631591797,
+      "firstParseMs": 0.006625175476074219,
+      "modelHeapMB": 0.000732421875,
+      "modelRssMB": 0,
+      "peakRssMB": 91.078125,
+      "peakRssOverBaselineMB": 0.06252288818359375,
+      "baselineRssMB": 54.37962341308594
+    },
+    "latency": {
+      "calls": 100000,
+      "meanUs": 0.021398769999984402,
+      "p50Us": 0,
+      "p90Us": 0.042,
+      "p99Us": 0.083,
+      "p999Us": 0.084,
+      "maxUs": 17.958,
+      "usPerToken": 0.0036238391193877057
+    },
+    "throughput": {
+      "1": {
+        "threads": 1,
+        "callsPerSec": 453046329.6714066,
+        "tokensPerSec": 2675238576.7096562,
+        "runs": [
+          489350820.4713896,
+          453046329.6714066,
+          447878664.85592
+        ]
+      }
+    }
+  }
+}

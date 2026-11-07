@@ -18,8 +18,8 @@ import { parseArgs } from "node:util";
 import { SUITES, type Suite, type SuiteName } from "../../eval.config.ts";
 import { hashSplit, loadExamples } from "../data/load.ts";
 import { MODELS_DIR, PREDICTIONS_DIR, ROOT, type Split } from "../data/paths.ts";
-import type { Example, Span } from "../types.ts";
-import { scoreAll } from "./accuracy.ts";
+import type { Example, ScoredParse } from "../types.ts";
+import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
 import type {
   LatencyArgs,
   PredictArgs,
@@ -140,13 +140,18 @@ async function predict(impl: string, model: string, out: string, examples: reado
     model,
     out,
   } satisfies PredictArgs);
-  const byId = new Map<string, Span[]>();
+  const byId = new Map<string, ScoredParse>();
   for (const line of readFileSync(out, "utf8").split("\n")) {
     if (!line) continue;
-    const p = JSON.parse(line) as { id: string; spans: Span[] };
-    byId.set(p.id, p.spans);
+    const p = JSON.parse(line) as ScoredParse & { id: string };
+    byId.set(p.id, p);
   }
-  return { ...r, predictions: examples.map((ex) => byId.get(ex.id) ?? []) };
+  const parses = examples.map((ex) => byId.get(ex.id));
+  return {
+    ...r,
+    predictions: parses.map((p) => p?.spans ?? []),
+    confidences: parses.map((p) => p?.confidence),
+  };
 }
 
 function gitInfo(): RunResult["git"] {
@@ -193,7 +198,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     const out = join(PREDICTIONS_DIR, `${runId}.jsonl`);
     const p = await predict(impl, main.model, out, evalExamples);
     metrics.accuracy = {
-      ...scoreAll(evalExamples, p.predictions),
+      ...scoreAll(evalExamples, p.predictions, p.confidences),
       parseErrors: p.parseErrors,
       firstParseError: p.firstError,
     };
@@ -201,6 +206,24 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     log(
       `  accuracy: exact ${(a.exactMatch * 100).toFixed(2)}%, token ${(a.tokenAccuracy * 100).toFixed(2)}% (${secs(t0)})`,
     );
+    const rc = a.riskCoverage;
+    if (rc) {
+      const at = rc.atTarget;
+      log(
+        `  risk–coverage: AURC ${(rc.aurc * 100).toFixed(2)}%, ` +
+          (at
+            ? `${(at.target * 100).toFixed(0)}% exact at ${(at.coverage * 100).toFixed(1)}% coverage (confidence ≥ ${at.threshold.toPrecision(3)})`
+            : `${(TARGET_EXACT_MATCH * 100).toFixed(0)}% exact not reached`),
+      );
+    }
+    const unscored = p.confidences.filter((x) => typeof x !== "number" || !Number.isFinite(x));
+    if (!rc && unscored.length < p.confidences.length) {
+      log(
+        c.yellow(
+          `  risk–coverage skipped: ${unscored.length} parses had no finite confidence (parse errors count)`,
+        ),
+      );
+    }
     if (p.parseErrors) log(c.red(`  ${p.parseErrors} parse errors, first: ${p.firstError}`));
   }
   if (enabled("memory")) {

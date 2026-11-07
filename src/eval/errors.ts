@@ -13,7 +13,7 @@ import { parseArgs } from "node:util";
 import { hashSplit, loadExamples } from "../data/load.ts";
 import { PREDICTIONS_DIR, splitPath } from "../data/paths.ts";
 import { tokenize } from "../tokens.ts";
-import type { Span } from "../types.ts";
+import type { ScoredParse, Span } from "../types.ts";
 import { normalizeSpans, scoreExample } from "./accuracy.ts";
 import { c, renderTable } from "./report.ts";
 import { findRun } from "./results.ts";
@@ -41,10 +41,13 @@ if ((await hashSplit(split, evalExamples)) !== run.data.evalHash) {
   console.log(c.yellow(`note: ${splitPath(split)} changed since this run; ids may not line up`));
 }
 const predicted = new Map<string, Span[]>();
+const confidence = new Map<string, number>();
 for (const line of readFileSync(predPath, "utf8").split("\n")) {
   if (!line) continue;
-  const p = JSON.parse(line) as { id: string; spans: Span[] };
+  const p = JSON.parse(line) as ScoredParse & { id: string };
   predicted.set(p.id, p.spans);
+  // JSON writes NaN and ±Infinity as null.
+  if (typeof p.confidence === "number") confidence.set(p.id, p.confidence);
 }
 
 const slice = opts.slice ? SLICES.find((s) => s.name === opts.slice) : undefined;
@@ -101,6 +104,8 @@ for (const ex of wrong.slice(0, limit)) {
     ];
   });
   const tags = [ex.source, ...(ex.noise ?? [])].join(", ");
-  console.log(`\n${c.bold(ex.text.replaceAll("\n", "\\n"))}  ${c.dim(`${ex.id} (${tags})`)}`);
+  const conf = confidence.get(ex.id);
+  const meta = `${ex.id} (${tags})${conf === undefined ? "" : ` confidence ${conf.toPrecision(3)}`}`;
+  console.log(`\n${c.bold(ex.text.replaceAll("\n", "\\n"))}  ${c.dim(meta)}`);
   console.log(renderTable(["token", "gold", "predicted", ""], rows, ["l", "l", "l", "l"]));
 }
