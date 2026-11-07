@@ -6,7 +6,7 @@ US address parsing, ready for production:
 - **Accurate:** 98.25% of held-out test addresses parsed exactly right, 99.85% of words
   labeled right.
 - **Small and fast:** ~390 KB gzipped including the model, ~100k/sec, nothing to download or set up.
-- **Comprehensive:**: Any US physical or mailing addree: street addresses, PO boxes, rural and highway contract routes, general
+- **Comprehensive:** Any US physical or mailing address: street addresses, PO boxes, rural and highway contract routes, general
 delivery, mileposts and military mail.
 - **Says how sure it is:** `confidence` is the probability that every span is right. Accept
   confident parses and send the rest for review; the 90% most confident test parses are 98.86%
@@ -82,28 +82,25 @@ spans point into the input unchanged. Names of people and businesses are `NotAdd
 
 The data is a custom blend from several different sources:
 
-| dataset            | share | source                                         | example                                   |
-| ------------------ | ----: | ---------------------------------------------- | ----------------------------------------- |
-| `openaddresses`    | 45.4% | libpostal: OpenAddresses government data       | 123 Main St, Springfield, IL 62704        |
-| `osm`              | 34.5% | libpostal: OpenStreetMap addresses             | 45 Oak Ave Apt 2, Portland, OR 97214      |
-| `ways`             |  7.7% | libpostal: OpenStreetMap street and its place  | Sled Ct, Palm Coast, Florida              |
-| `places`           |  4.1% | libpostal: OpenStreetMap place names           | Willistown, Chester County, PA            |
-| `embedded`         |  1.8% | synthetic: an address inside other text        | Mail to 12 Main St, thanks                |
-| `junk`             |  1.2% | synthetic: text with no address                | N/A; same as above; 555-0123              |
-| `po-box`           |  1.8% | synthetic                                      | PO Box 123, P.O. Box, POB, Drawer         |
-| `rural-route`      |  0.9% | synthetic                                      | RR 2 Box 123, Rural Route 2, RFD 3        |
-| `milepost`         |  0.9% | synthetic                                      | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy   |
-| `highway-contract` |  0.7% | synthetic                                      | HC 60 Box 4321, HCR 1 Box 45              |
-| `general-delivery` |  0.5% | synthetic                                      | General Delivery, Kenai, AK 99611         |
-| `military`         |  0.5% | synthetic                                      | PSC 1234, Box 5678, APO AE 09204          |
+| dataset            | share | training examples | source                                         | example                                   |
+| ------------------ | ----: | ----------------: | ---------------------------------------------- | ----------------------------------------- |
+| `openaddresses`    | 45.4% |           226,759 | libpostal: OpenAddresses government data       | 123 Main St, Springfield, IL 62704        |
+| `osm`              | 34.5% |           172,336 | libpostal: OpenStreetMap addresses             | 45 Oak Ave Apt 2, Portland, OR 97214      |
+| `ways`             |  7.7% |            38,549 | libpostal: OpenStreetMap street and its place  | Sled Ct, Palm Coast, Florida              |
+| `places`           |  4.1% |            20,408 | libpostal: OpenStreetMap place names           | Willistown, Chester County, PA            |
+| `embedded`         |  1.8% |             8,843 | synthetic: an address inside other text        | Mail to 12 Main St, thanks                |
+| `junk`             |  1.2% |             6,122 | synthetic: text with no address                | N/A; same as above; 555-0123              |
+| `po-box`           |  1.8% |             9,070 | synthetic                                      | PO Box 123, P.O. Box, POB, Drawer         |
+| `rural-route`      |  0.9% |             4,535 | synthetic                                      | RR 2 Box 123, Rural Route 2, RFD 3        |
+| `milepost`         |  0.9% |             4,535 | synthetic                                      | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy   |
+| `highway-contract` |  0.7% |             3,401 | synthetic                                      | HC 60 Box 4321, HCR 1 Box 45              |
+| `general-delivery` |  0.5% |             2,721 | synthetic                                      | General Delivery, Kenai, AK 99611         |
+| `military`         |  0.5% |             2,721 | synthetic                                      | PSC 1234, Box 5678, APO AE 09204          |
+| **total**          |  100% |       **500,000** |                                                |                                           |
 
-Share is each dataset's weight in the training and eval sets (`DATASET_WEIGHTS` in
-`eval.config.ts`). The libpostal datasets are libpostal's 2017 US training data, relabeled. Most
-synthetic examples end with the city, state and ZIP of a real libpostal address. Random formatting
-noise (`src/data/noise.ts`: case, punctuation, spacing) is added to the examples.
-
-Addresses written other ways, such as free-form notes or with
-typos, parse less well.
+Share is each dataset's weight in the training and eval sets. The shipped model is trained on the first 500,000 examples of the blend.
+Most synthetic examples end with the city, state and ZIP of a real libpostal address.
+Random formatting noise (case, punctuation, spacing) is added to the examples.
 
 ## How it works and how it's measured
 
@@ -112,7 +109,7 @@ I approached this with an "eval first" methodology. I defined two things:
 - a collection of evals to optimize against: accuracy, confidence ranking, speed, memory, size,
 training cost, etc
 
-Then, once I set an agent loose on this to hillclimb on these evals.
+Then, once I set an agent loose to hillclimb on these evals.
 What it ended up with is a linear-chain CRF over whitespace tokens with hashed features.
 For more info, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
