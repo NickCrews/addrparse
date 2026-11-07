@@ -93,19 +93,19 @@ The data is a custom blend from several different sources:
 
 | dataset            | share | training examples | source                                        | example                                 |
 | ------------------ | ----: | ----------------: | --------------------------------------------- | --------------------------------------- |
-| `openaddresses`    | 44.5% |           222,720 | libpostal: OpenAddresses government data      | 123 Main St, Springfield, IL 62704      |
-| `osm`              | 33.9% |           169,267 | libpostal: OpenStreetMap addresses            | 45 Oak Ave Apt 2, Portland, OR 97214    |
-| `ways`             |  7.6% |            37,862 | libpostal: OpenStreetMap street and its place | Sled Ct, Palm Coast, Florida            |
-| `places`           |  4.0% |            20,044 | libpostal: OpenStreetMap place names          | Willistown, Chester County, PA          |
-| `embedded`         |  1.7% |             8,686 | synthetic: an address inside other text       | Mail to 12 Main St, thanks              |
-| `junk`             |  1.2% |             6,013 | synthetic: text with no address               | N/A; same as above; 555-0123            |
-| `po-box`           |  1.8% |             8,908 | synthetic                                     | PO Box 123, P.O. Box, POB, Drawer       |
-| `ak-voterfile`     |  1.8% |             8,908 | Alaska voter file, hand- and rule-labeled     | HOUSE #6, KASIGLUK, AK 99609            |
-| `rural-route`      |  0.9% |             4,454 | synthetic                                     | RR 2 Box 123, Rural Route 2, RFD 3      |
-| `milepost`         |  0.9% |             4,454 | synthetic                                     | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy |
-| `highway-contract` |  0.7% |             3,340 | synthetic                                     | HC 60 Box 4321, HCR 1 Box 45            |
-| `general-delivery` |  0.5% |             2,672 | synthetic                                     | General Delivery, Kenai, AK 99611       |
-| `military`         |  0.5% |             2,672 | synthetic                                     | PSC 1234, Box 5678, APO AE 09204        |
+| `openaddresses`    | 43.4% |           217,019 | libpostal: OpenAddresses government data      | 123 Main St, Springfield, IL 62704      |
+| `osm`              | 33.0% |           164,934 | libpostal: OpenStreetMap addresses            | 45 Oak Ave Apt 2, Portland, OR 97214    |
+| `ways`             |  7.4% |            36,893 | libpostal: OpenStreetMap street and its place | Sled Ct, Palm Coast, Florida            |
+| `ak-voterfile`     |  4.3% |            21,478 | Alaska voter file, hand- and rule-labeled     | HOUSE #6, KASIGLUK, AK 99609            |
+| `places`           |  3.9% |            19,531 | libpostal: OpenStreetMap place names          | Willistown, Chester County, PA          |
+| `embedded`         |  1.7% |             8,463 | synthetic: an address inside other text       | Mail to 12 Main St, thanks              |
+| `junk`             |  1.2% |             5,859 | synthetic: text with no address               | N/A; same as above; 555-0123            |
+| `po-box`           |  1.7% |             8,680 | synthetic                                     | PO Box 123, P.O. Box, POB, Drawer       |
+| `rural-route`      |  0.9% |             4,340 | synthetic                                     | RR 2 Box 123, Rural Route 2, RFD 3      |
+| `milepost`         |  0.9% |             4,340 | synthetic                                     | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy |
+| `highway-contract` |  0.7% |             3,255 | synthetic                                     | HC 60 Box 4321, HCR 1 Box 45            |
+| `general-delivery` |  0.5% |             2,604 | synthetic                                     | General Delivery, Kenai, AK 99611       |
+| `military`         |  0.5% |             2,604 | synthetic                                     | PSC 1234, Box 5678, APO AE 09204        |
 | **total**          |  100% |       **500,000** |                                               |                                         |
 
 Share is each dataset's weight in the training and eval sets. The shipped model is trained on the first 500,000 examples of the blend.

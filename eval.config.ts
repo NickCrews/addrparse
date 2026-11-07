@@ -4,8 +4,8 @@ import type { Blend } from "./src/data/blend.ts";
  * Default share of each dataset (`src/data/datasets.ts`) in training and eval sets: every prefix
  * of a blended split has the datasets in these proportions until one runs out. A dataset not
  * listed here gets weight 1. The libpostal and not-address weights are in proportion to how many
- * examples each has, so they all run out together; the synthetic address forms and the
- * hand-labeled Alaska voter-file addresses are each about 0.5–2% of the blend.
+ * examples each has, so they all run out together; the synthetic address forms are each about
+ * 0.5–2% of the blend and the hand-labeled Alaska voter-file addresses about 4%.
  */
 export const DATASET_WEIGHTS: Record<string, number> = {
   openaddresses: 1,
@@ -20,7 +20,8 @@ export const DATASET_WEIGHTS: Record<string, number> = {
   "general-delivery": 0.012,
   milepost: 0.02,
   military: 0.012,
-  "ak-voterfile": 0.04,
+  // Enough that the first 500,000 training examples (the full suite) use all of its train split.
+  "ak-voterfile": 0.1,
 };
 
 /**
