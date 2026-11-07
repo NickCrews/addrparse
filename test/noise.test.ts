@@ -261,8 +261,9 @@ const bag = (ex: { text: string; spans: Span[] }, f = (s: string) => s) =>
     .sort();
 
 /**
- * Clean examples from the built dev split, or from the committed fixture when there is no built
- * data (CI), so real shapes are covered too.
+ * Address examples without noise from the built dev split, or from the committed fixture when
+ * there is no built data (CI), so real shapes are covered too. NotAddress examples are left out:
+ * the build never adds noise to them.
  */
 function devExamples(n: number): Example[] {
   const path = existsSync(splitPath("dev"))
@@ -272,7 +273,7 @@ function devExamples(n: number): Example[] {
   return lines
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Example)
-    .filter((ex) => !ex.noise)
+    .filter((ex) => !ex.noise && !ex.spans.some((s) => s.label === "NotAddress"))
     .slice(0, n);
 }
 

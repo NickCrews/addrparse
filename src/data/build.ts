@@ -1,7 +1,10 @@
 /**
  * Builds data/{train,dev,test}.jsonl and data/stats.json from data/raw/*.tsv.
  *
- * - Sources are interleaved line by line, so any prefix of a split mixes them evenly.
+ * - Each source contributes its first SOURCE_LIMITS lines (`--limit <source>=<n>`), so a raw
+ *   file longer than the limit doesn't change the build.
+ * - Sources are interleaved in proportion to SOURCE_WEIGHTS (libpostal.ts), so any prefix of a
+ *   split mixes them in those proportions (`mix.ts`). `--mix <source>=<w>` overrides a weight.
  * - Each line is refined (`refine.ts`), then either replaced by its hand-checked override in
  *   `overrides/gold.jsonl` or checked against the whole corpus (`gold.ts`). A first pass over
  *   all lines builds the corpus counts and finds the texts that overrides apply to.
@@ -16,7 +19,8 @@
  *   split with its address; a junk text by `junkSplitKey`, so variants of one name or phone
  *   number share a split.
  *
- *   node src/data/build.ts [--noise-scale 1] [--junk-rate 0.02] [--embedded-rate 0.02]
+ *   node src/data/build.ts [--mix <source>=<weight> ...] [--limit <source>=<n> ...]
+ *     [--noise-scale 1] [--junk-rate 0.02] [--embedded-rate 0.02]
  *
  * `--noise-scale` multiplies every rate in NOISE_RATES; 0 builds clean data.
  */
@@ -38,8 +42,16 @@ import {
   resolveSpans,
   type GoldOverride,
 } from "./gold.ts";
-import { LIBPOSTAL_FILES, LIBPOSTAL_SNAPSHOT, type LibpostalSource } from "./libpostal.ts";
+import {
+  LIBPOSTAL_FILES,
+  LIBPOSTAL_SNAPSHOT,
+  parseSourceNumbers,
+  SOURCE_LIMITS,
+  SOURCE_WEIGHTS,
+  type LibpostalSource,
+} from "./libpostal.ts";
 import { lineKey, refineLine, splitFor } from "./lines.ts";
+import { mixOrder } from "./mix.ts";
 import { addNoise, NOISE_NAMES, NOISE_RATES, seededRng, type NoiseName } from "./noise.ts";
 import { NOT_ADDRESS_DEFAULTS, notAddressExamples, type NotAddressOptions } from "./not-address.ts";
 import { DATA_DIR, DATA_STATS_PATH, rawPath, splitPath, type Split } from "./paths.ts";
@@ -48,6 +60,8 @@ const SPLITS: readonly Split[] = ["train", "dev", "test"];
 
 const { values: args } = parseArgs({
   options: {
+    mix: { type: "string", multiple: true, default: [] },
+    limit: { type: "string", multiple: true, default: [] },
     "noise-scale": { type: "string", default: "1" },
     "junk-rate": { type: "string", default: String(NOT_ADDRESS_DEFAULTS.junkRate) },
     "embedded-rate": { type: "string", default: String(NOT_ADDRESS_DEFAULTS.embeddedRate) },
@@ -68,16 +82,25 @@ const sources = (Object.keys(LIBPOSTAL_FILES) as LibpostalSource[]).filter((s) =
   existsSync(rawPath(s)),
 );
 if (sources.length === 0) throw new Error("no data/raw/*.tsv; run `pnpm data:fetch` first");
-const lines = sources.map((s) => readFileSync(rawPath(s), "utf8").split("\n").filter(Boolean));
-const maxLen = Math.max(...lines.map((l) => l.length));
+const weights = { ...SOURCE_WEIGHTS, ...parseSourceNumbers(args.mix ?? []) };
+const limits = { ...SOURCE_LIMITS, ...parseSourceNumbers(args.limit ?? []) };
+for (const s of Object.keys(LIBPOSTAL_FILES) as LibpostalSource[]) {
+  if (weights[s] > 0 && !sources.includes(s)) console.warn(`${s}: no ${rawPath(s)}; skipped`);
+}
+if (!sources.some((s) => weights[s] > 0 && limits[s] > 0)) {
+  throw new Error("every source with raw data has weight or limit 0");
+}
+const lines = sources.map((s) =>
+  readFileSync(rawPath(s), "utf8").split("\n").filter(Boolean).slice(0, limits[s]),
+);
 
-/** Every raw line with its source and line number, interleaving sources. */
+const lengths = lines.map((l) => l.length);
+const mixWeights = sources.map((s) => weights[s]);
+
+/** Every raw line with its source and line number, in the weighted mix order. */
 function* rawLines(): Generator<{ line: string; source: LibpostalSource; i: number }> {
-  for (let i = 0; i < maxLen; i++) {
-    for (let s = 0; s < sources.length; s++) {
-      const line = lines[s]![i];
-      if (line !== undefined) yield { line, source: sources[s]!, i };
-    }
+  for (const { source: s, i } of mixOrder(lengths, mixWeights)) {
+    yield { line: lines[s]![i]!, source: sources[s]!, i };
   }
 }
 
@@ -101,12 +124,18 @@ const outs = Object.fromEntries(SPLITS.map((s) => [s, createWriteStream(splitPat
 
 const stats = {
   libpostalSnapshot: LIBPOSTAL_SNAPSHOT,
+  weights: Object.fromEntries(sources.map((s) => [s, weights[s]])),
+  limits: Object.fromEntries(sources.map((s) => [s, limits[s]])),
   notAddress,
   linesRead: 0,
   examples: 0,
   duplicates: 0,
   /** Lines dropped, by reason, counting duplicates. `override` is lines rejected by overrides/gold.jsonl. */
   rejected: {} as Record<string, number>,
+  linesReadBySource: {} as Record<string, number>,
+  duplicatesBySource: {} as Record<string, number>,
+  /** `rejected`, per source. */
+  rejectedBySource: {} as Record<string, Record<string, number>>,
   /** Entries in overrides/gold.jsonl, and examples written with overridden labels. */
   overrides: {
     entries: overrides.size,
@@ -134,6 +163,14 @@ const stats = {
   labels: {} as Record<string, number>,
 };
 const bump = (m: Record<string, number>, k: string) => (m[k] = (m[k] ?? 0) + 1);
+function reject(source: string, reason: string) {
+  bump(stats.rejected, reason);
+  bump((stats.rejectedBySource[source] ??= {}), reason);
+}
+function duplicate(source: string) {
+  stats.duplicates++;
+  bump(stats.duplicatesBySource, source);
+}
 
 function write(ex: Example, split = splitFor(ex)) {
   outs[split].write(JSON.stringify(ex) + "\n");
@@ -146,20 +183,21 @@ function write(ex: Example, split = splitFor(ex)) {
 const seen = new Set<string>();
 for (const { line, source, i } of rawLines()) {
   stats.linesRead++;
+  bump(stats.linesReadBySource, source);
   const result = refineLine(line);
   if (!result) {
-    bump(stats.rejected, "unparseable");
+    reject(source, "unparseable");
     continue;
   }
   if (!result.ok) {
     for (const note of new Set(result.notes)) bump(stats.notes, note);
-    bump(stats.rejected, result.reason);
+    reject(source, result.reason);
     continue;
   }
   const override = overrideByText.get(result.text);
   let { spans, notes } = result;
   if (override?.reject !== undefined) {
-    bump(stats.rejected, "override");
+    reject(source, "override");
     continue;
   } else if (override?.spans) {
     spans = resolveSpans(result.text, override.spans);
@@ -170,13 +208,13 @@ for (const { line, source, i } of rawLines()) {
     spans = check.spans ?? spans;
     if (check.reject) {
       for (const note of new Set(notes)) bump(stats.notes, note);
-      bump(stats.rejected, check.reject);
+      reject(source, check.reject);
       continue;
     }
   }
   for (const note of new Set(notes)) bump(stats.notes, note);
   if (seen.has(result.text)) {
-    stats.duplicates++;
+    duplicate(source);
     continue;
   }
   seen.add(result.text);
@@ -196,7 +234,7 @@ for (const { line, source, i } of rawLines()) {
   if (override) stats.overrides.examples++;
   for (const extra of notAddressExamples(clean, notAddress)) {
     if (seen.has(extra.text)) {
-      stats.duplicates++;
+      duplicate(extra.source);
       continue;
     }
     seen.add(extra.text);
