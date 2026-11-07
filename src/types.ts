@@ -68,3 +68,25 @@ export interface Impl {
   train(examples: readonly Example[], ctx: TrainContext): TrainResult | Promise<TrainResult>;
   load(model: Uint8Array): Parser;
 }
+
+/**
+ * A parser that runs outside Node (a Python package, a C library) and is trained elsewhere.
+ * `impls/<name>/index.ts` default-exports one instead of an `Impl`. The harness measures only
+ * its accuracy: speed and memory of a subprocess aren't comparable to an in-process parse.
+ */
+export interface ReferenceImpl {
+  /** Parses every text; `spans[i]` is the parse of `texts[i]`. */
+  predict(
+    texts: readonly string[],
+    ctx: { log(message: string): void },
+  ): Promise<ReferencePrediction>;
+}
+
+export interface ReferencePrediction {
+  spans: Span[][];
+  /** Texts the parser failed on (their spans are empty), and the first failure. */
+  parseErrors: number;
+  firstError?: string;
+  /** Versions and counts the implementation wants recorded, e.g. package versions. */
+  info: Record<string, number | string>;
+}

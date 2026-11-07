@@ -16,6 +16,9 @@
  *   NotAddress or nothing, i.e. wrongly abstains.
  * - riskCoverage: when every parse has a confidence, exact match among the most confident
  *   examples. See `riskCoverage`.
+ * - coarse: the same three after collapsing labels to libpostal's granularity (COARSE), so a
+ *   parser that finds the street but splits it differently, or can't split it at all, still
+ *   gets credit.
  */
 import { LABEL_NAMES, type Label } from "../labels.ts";
 import { labelAt, tokenize } from "../tokens.ts";
@@ -64,6 +67,7 @@ export const COVERAGES = [1, 0.9, 0.8, 0.5] as const;
 export const TARGET_EXACT_MATCH = 0.99;
 
 export interface AccuracyMetrics extends SliceMetrics {
+  coarse: { exactMatch: number; tokenAccuracy: number; spanF1: number };
   tokens: number;
   span: Prf;
   perLabel: Record<string, Prf & { gold: number; predicted: number }>;
@@ -98,6 +102,58 @@ export function normalizeSpans(text: string, spans: readonly Span[]): Span[] {
     if (start < end) out.push({ start, end, label: s.label });
   }
   return out.sort((a, b) => a.start - b.start || a.end - b.end);
+}
+
+/**
+ * libpostal's granularity: the whole street is one field, as are the unit and the PO box. Each
+ * group is named by one of its labels.
+ */
+export const COARSE: Record<Label, Label> = {
+  AddressNumber: "AddressNumber",
+  AddressNumberSuffix: "AddressNumber",
+  StreetNamePreModifier: "StreetName",
+  StreetNamePreDirectional: "StreetName",
+  StreetNamePreType: "StreetName",
+  StreetName: "StreetName",
+  StreetNamePostType: "StreetName",
+  StreetNamePostDirectional: "StreetName",
+  OccupancyType: "OccupancyIdentifier",
+  OccupancyIdentifier: "OccupancyIdentifier",
+  USPSBoxType: "USPSBoxID",
+  USPSBoxID: "USPSBoxID",
+  PlaceName: "PlaceName",
+  StateName: "StateName",
+  ZipCode: "ZipCode",
+  CountryName: "CountryName",
+  NotAddress: "NotAddress",
+};
+
+/**
+ * Merges consecutive same-label spans whose gap has no letter, digit, `,` or `;`:
+ * "Martin Luther King" and "Lands ' End" are one span, "Anchorage, AK" never merges across the
+ * comma.
+ */
+export function mergeAdjacent(text: string, spans: readonly Span[]): Span[] {
+  const out: Span[] = [];
+  for (const s of [...spans].sort((a, b) => a.start - b.start)) {
+    const last = out.at(-1);
+    if (
+      last &&
+      last.label === s.label &&
+      /^[^\p{L}\p{N},;]*$/u.test(text.slice(last.end, s.start))
+    ) {
+      last.end = Math.max(last.end, s.end);
+    } else out.push({ ...s });
+  }
+  return out;
+}
+
+/** Spans relabeled with COARSE, with the pieces of one field merged back into one span. */
+export function coarsenSpans(text: string, spans: readonly Span[]): Span[] {
+  return mergeAdjacent(
+    text,
+    normalizeSpans(text, spans).map((s) => ({ ...s, label: COARSE[s.label] })),
+  );
 }
 
 const spanKey = (s: Span) => `${s.start}:${s.end}:${s.label}`;
@@ -279,8 +335,22 @@ export function scoreAll(
     slices[slice.name] = { examples: n, exactMatch, tokenAccuracy, spanF1 };
   }
 
+  const coarse = aggregate(
+    examples.map((ex, i) =>
+      scoreExample(
+        { ...ex, spans: coarsenSpans(ex.text, ex.spans) },
+        coarsenSpans(ex.text, predictions[i] ?? []),
+      ),
+    ),
+  );
+
   return {
     ...aggregate(scores),
+    coarse: {
+      exactMatch: coarse.exactMatch,
+      tokenAccuracy: coarse.tokenAccuracy,
+      spanF1: coarse.spanF1,
+    },
     perLabel,
     confusions: [...confusionCounts]
       .sort((a, b) => b[1] - a[1])

@@ -12,9 +12,14 @@ export interface RunResult {
   suite: string;
   config: Suite;
   git: { sha: string | null; dirty: boolean };
-  /** Hash of the impl's sources plus shared src/; equal hashes mean the same code. */
+  /**
+   * Hash of the impl's sources plus shared src/ outside src/eval; equal hashes mean the same
+   * model code. A reference's predictions also depend on src/eval/reference.ts and the
+   * externally installed parser, recorded in `metrics.reference.info`.
+   */
   implHash: string;
-  data: { trainHash: string; evalHash: string };
+  /** `trainHash` is null for a reference impl, which is trained elsewhere. */
+  data: { trainHash: string | null; evalHash: string };
   machine: { cpu: string; cores: number; memoryGB: number; os: string; node: string };
   metrics: {
     accuracy?: AccuracyMetrics & { parseErrors: number; firstParseError?: string };
@@ -59,7 +64,13 @@ export interface RunResult {
       string,
       { threads: number; callsPerSec: number; tokensPerSec: number; runs: number[] }
     >;
-    code: { bytes: number; lines: number; files: number };
+    /** The impl's own TypeScript; absent for a reference impl, whose code lives elsewhere. */
+    code?: { bytes: number; lines: number; files: number };
+    /**
+     * Present only for a reference impl (ReferenceImpl), which has no other metrics but
+     * accuracy: wall time of its batch prediction, and the versions it reported.
+     */
+    reference?: { seconds: number; info: Record<string, number | string> };
     determinism?: { identical: boolean; hashes: [string, string] };
     learningCurve?: { trainExamples: number; exactMatch: number; tokenAccuracy: number }[];
   };

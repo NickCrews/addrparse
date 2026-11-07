@@ -99,6 +99,14 @@ export const HEADLINE: readonly Metric[] = [
     get: (r) => r.metrics.accuracy?.abstention?.addressAbstained,
   },
   {
+    name: "coarse exact match",
+    better: "higher",
+    noise: 0,
+    format: pct,
+    points: true,
+    get: (r) => r.metrics.accuracy?.coarse?.exactMatch,
+  },
+  {
     name: "latency p50 µs",
     better: "lower",
     noise: 0.05,
@@ -189,5 +197,5 @@ export const HEADLINE: readonly Metric[] = [
     format: mb,
     get: (r) => r.metrics.training?.peakRssOverBaselineMB,
   },
-  { name: "code lines", better: "lower", noise: 0, format: int, get: (r) => r.metrics.code.lines },
+  { name: "code lines", better: "lower", noise: 0, format: int, get: (r) => r.metrics.code?.lines },
 ];

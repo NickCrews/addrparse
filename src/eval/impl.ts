@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { IMPLS_DIR, ROOT } from "../data/paths.ts";
-import type { Impl } from "../types.ts";
+import type { Impl, ReferenceImpl } from "../types.ts";
 
 export function implDir(name: string): string {
   return join(IMPLS_DIR, name);
@@ -12,14 +12,25 @@ export function listImpls(): string[] {
   return readdirSync(IMPLS_DIR).filter((n) => existsSync(join(IMPLS_DIR, n, "index.ts")));
 }
 
-export async function importImpl(name: string): Promise<Impl> {
+async function importDefault(name: string): Promise<Partial<Impl & ReferenceImpl>> {
   const path = join(implDir(name), "index.ts");
   if (!existsSync(path)) throw new Error(`no ${path}; impls are ${listImpls().join(", ")}`);
-  const mod = (await import(path)) as { default?: Impl };
-  if (!mod.default?.train || !mod.default.load) {
-    throw new Error(`${path} must default-export { train, load }`);
+  const mod = (await import(path)) as { default?: Partial<Impl & ReferenceImpl> };
+  return mod.default ?? {};
+}
+
+export async function importImpl(name: string): Promise<Impl> {
+  const impl = await importDefault(name);
+  if (!impl.train || !impl.load) {
+    throw new Error(`impls/${name}/index.ts must default-export { train, load }`);
   }
-  return mod.default;
+  return impl as Impl;
+}
+
+/** The impl as a ReferenceImpl, or undefined when it is an ordinary trainable Impl. */
+export async function importReference(name: string): Promise<ReferenceImpl | undefined> {
+  const impl = await importDefault(name);
+  return impl.predict ? (impl as ReferenceImpl) : undefined;
 }
 
 function walk(dir: string): string[] {
@@ -31,10 +42,16 @@ function walk(dir: string): string[] {
     });
 }
 
-/** Source files that can change a model: the impl's own directory plus shared src/, minus the harness. */
+/**
+ * Source files that can change a model or a reference's predictions: the impl's own directory
+ * (TypeScript, plus Python scripts and their uv lockfiles) and shared src/, minus the harness.
+ */
 function sourceFiles(name: string): string[] {
-  const shared = walk(join(ROOT, "src")).filter((p) => !p.includes(`${join("src", "eval")}`));
-  return [...walk(implDir(name)), ...shared].filter((p) => p.endsWith(".ts"));
+  const own = walk(implDir(name)).filter((p) => /\.(ts|py|lock)$/.test(p));
+  const shared = walk(join(ROOT, "src")).filter(
+    (p) => p.endsWith(".ts") && !p.includes(`${join("src", "eval")}`),
+  );
+  return [...own, ...shared];
 }
 
 export function implSourceHash(name: string): string {
