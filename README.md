@@ -2,15 +2,16 @@
 
 US address parsing, ready for production:
 
-- **Run anywhere:** Dependency-free, pure javascript/typescript
+- **Run anywhere:** Pure javascript/typescript, no dependencies
 - **Accurate:** 98.25% of held-out test addresses parsed exactly right, 99.85% of words
   labeled right.
 - **Small and fast:** ~390 KB gzipped including the model, ~100k/sec, nothing to download or set up.
+- **Comprehensive:**: Any US physical or mailing addree: street addresses, PO boxes, rural and highway contract routes, general
+delivery, mileposts and military mail.
 - **Says how sure it is:** `confidence` is the probability that every span is right. Accept
   confident parses and send the rest for review; the 90% most confident test parses are 98.86%
   exactly right.
-- **Recognizes non-addresses:** text around an address, or text with no address in it, is
-  labeled `NotAddress` instead of being forced into a parse.
+- **Recognizes non-addresses:** junk is labeled `NotAddress` instead of being forced into a parse.
 
 ```js
 import { parse } from "addrparse";
@@ -74,22 +75,46 @@ Thoroughfare, Landmark, and Postal Address Data Standard:
 
 ## Scope
 
-US addresses only: street addresses, PO boxes, rural and highway contract routes, general
+All physical and mailing addresses in the US: street addresses, PO boxes, rural and highway contract routes, general
 delivery, mileposts and military mail. It does not validate addresses (whether one exists or
 gets mail), geocode them, or standardize them (rewrite Street as ST, fill in a missing ZIP);
 spans point into the input unchanged. Names of people and businesses are `NotAddress`.
 
-The test set comes from the same sources and formats as the training data (OpenStreetMap and
-OpenAddresses addresses with formatting noise such as dropped commas and all caps, synthetic
-mailing-address forms, junk text). Addresses written other ways, such as free-form notes or with
+The data is a custom blend from several different sources:
+
+| dataset            | share | source                                         | example                                   |
+| ------------------ | ----: | ---------------------------------------------- | ----------------------------------------- |
+| `openaddresses`    | 45.4% | libpostal: OpenAddresses government data       | 123 Main St, Springfield, IL 62704        |
+| `osm`              | 34.5% | libpostal: OpenStreetMap addresses             | 45 Oak Ave Apt 2, Portland, OR 97214      |
+| `ways`             |  7.7% | libpostal: OpenStreetMap street and its place  | Sled Ct, Palm Coast, Florida              |
+| `places`           |  4.1% | libpostal: OpenStreetMap place names           | Willistown, Chester County, PA            |
+| `embedded`         |  1.8% | synthetic: an address inside other text        | Mail to 12 Main St, thanks                |
+| `junk`             |  1.2% | synthetic: text with no address                | N/A; same as above; 555-0123              |
+| `po-box`           |  1.8% | synthetic                                      | PO Box 123, P.O. Box, POB, Drawer         |
+| `rural-route`      |  0.9% | synthetic                                      | RR 2 Box 123, Rural Route 2, RFD 3        |
+| `milepost`         |  0.9% | synthetic                                      | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy   |
+| `highway-contract` |  0.7% | synthetic                                      | HC 60 Box 4321, HCR 1 Box 45              |
+| `general-delivery` |  0.5% | synthetic                                      | General Delivery, Kenai, AK 99611         |
+| `military`         |  0.5% | synthetic                                      | PSC 1234, Box 5678, APO AE 09204          |
+
+Share is each dataset's weight in the training and eval sets (`DATASET_WEIGHTS` in
+`eval.config.ts`). The libpostal datasets are libpostal's 2017 US training data, relabeled. Most
+synthetic examples end with the city, state and ZIP of a real libpostal address. Random formatting
+noise (`src/data/noise.ts`: case, punctuation, spacing) is added to the examples.
+
+Addresses written other ways, such as free-form notes or with
 typos, parse less well.
 
 ## How it works and how it's measured
 
-The parser is a linear-chain CRF over whitespace tokens with hashed features, trained in this
-repository's eval harness, which measures accuracy, confidence ranking, speed, memory, size and
-training cost and saves every run. [CONTRIBUTING.md](CONTRIBUTING.md) covers the harness, the
-other parsers it compares, and how the training data is built.
+I approached this with an "eval first" methodology. I defined two things:
+- the dataset that I wanted to consider
+- a collection of evals to optimize against: accuracy, confidence ranking, speed, memory, size,
+training cost, etc
+
+Then, once I set an agent loose on this to hillclimb on these evals.
+What it ended up with is a linear-chain CRF over whitespace tokens with hashed features.
+For more info, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License and data attribution
 
