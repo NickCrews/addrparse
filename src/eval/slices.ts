@@ -2,6 +2,7 @@
  * Subsets of the eval set that accuracy is also reported on. Add a slice by appending here;
  * every run reports every slice, so slices also show where a change helped or hurt.
  */
+import { NOISE_NAMES } from "../data/noise.ts";
 import type { Example } from "../types.ts";
 
 export interface Slice {
@@ -34,4 +35,9 @@ export const SLICES: readonly Slice[] = [
   { name: "tokens>=10", test: (ex) => tokenCount(ex) >= 10 },
   { name: "gold=clean", test: (ex) => !heuristicGold(ex) },
   { name: "gold=heuristic", test: heuristicGold },
+  { name: "noise=none", test: (ex) => !ex.noise?.length },
+  ...NOISE_NAMES.map((n) => ({
+    name: `noise=${n}`,
+    test: (ex: Example) => !!ex.noise?.includes(n),
+  })),
 ];

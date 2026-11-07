@@ -20,6 +20,8 @@ export interface Example {
    * says a field was removed from the text, and "override" that the labels were checked by hand.
    */
   notes?: string[];
+  /** Formatting noise applied after rendering, e.g. ["unit-joined"]; see src/data/noise.ts. */
+  noise?: string[];
 }
 
 /** A loaded model. `parse` must be synchronous and side-effect free. */

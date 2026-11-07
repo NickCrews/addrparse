@@ -7,7 +7,9 @@
  * - exactMatch: share of examples whose span set equals gold exactly. The headline number;
  *   it's what "parsed correctly" means to a caller.
  * - tokenAccuracy: share of whitespace tokens whose label (the span covering the token's first
- *   character, or none) matches gold.
+ *   character, or none) matches gold. A token holding several gold spans, e.g. "Apt4" (unit type
+ *   and identifier, see `unit-joined` in src/data/noise.ts), counts only its first span's label, so
+ *   token accuracy can't see the second one; exact match and span F1 do.
  * - span precision/recall/F1: a predicted span counts only if start, end and label all match.
  */
 import { LABEL_NAMES, type Label } from "../labels.ts";
