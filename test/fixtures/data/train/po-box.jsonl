@@ -1,0 +1,7 @@
+{"id":"po-box:0","text":"PO Box 375","spans":[{"start":0,"end":6,"label":"USPSBoxType"},{"start":7,"end":10,"label":"USPSBoxID"}],"source":"po-box"}
+{"id":"po-box:1","text":"PO Box 6658","spans":[{"start":0,"end":6,"label":"USPSBoxType"},{"start":7,"end":11,"label":"USPSBoxID"}],"source":"po-box"}
+{"id":"po-box:2","text":"PO Box 9755, White City, OR","spans":[{"start":0,"end":6,"label":"USPSBoxType"},{"start":7,"end":11,"label":"USPSBoxID"},{"start":13,"end":23,"label":"PlaceName"},{"start":25,"end":27,"label":"StateName"}],"source":"po-box"}
+{"id":"po-box:3","text":"PO BOX 157 GLENDALE, AZ 85307","spans":[{"start":0,"end":6,"label":"USPSBoxType"},{"start":7,"end":10,"label":"USPSBoxID"},{"start":11,"end":19,"label":"PlaceName"},{"start":21,"end":23,"label":"StateName"},{"start":24,"end":29,"label":"ZipCode"}],"source":"po-box"}
+{"id":"po-box:4","text":"2815 E Avenue, P O Box 584, Grweneville, TN","spans":[{"start":0,"end":4,"label":"AddressNumber"},{"start":5,"end":6,"label":"StreetName"},{"start":7,"end":13,"label":"StreetNamePostType"},{"start":15,"end":22,"label":"USPSBoxType"},{"start":23,"end":26,"label":"USPSBoxID"},{"start":28,"end":39,"label":"PlaceName"},{"start":41,"end":43,"label":"StateName"}],"source":"po-box","noise":["typo"]}
+{"id":"po-box:5","text":"PO Box 6226","spans":[{"start":0,"end":6,"label":"USPSBoxType"},{"start":7,"end":11,"label":"USPSBoxID"}],"source":"po-box"}
+{"id":"po-box:6","text":"P.O. Box 719","spans":[{"start":0,"end":8,"label":"USPSBoxType"},{"start":9,"end":12,"label":"USPSBoxID"}],"source":"po-box"}

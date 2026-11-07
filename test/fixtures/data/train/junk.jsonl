@@ -1,0 +1,4 @@
+{"id":"junk:openaddresses:16","text":"MARY THOMAS","spans":[{"start":0,"end":11,"label":"NotAddress"}],"source":"junk"}
+{"id":"junk:osm:50","text":"Steven Wright","spans":[{"start":0,"end":13,"label":"NotAddress"}],"source":"junk"}
+{"id":"junk:openaddresses:56","text":"Friendly","spans":[{"start":0,"end":8,"label":"NotAddress"}],"source":"junk"}
+{"id":"junk:openaddresses:147","text":"voicemail evening thanks","spans":[{"start":0,"end":24,"label":"NotAddress"}],"source":"junk"}

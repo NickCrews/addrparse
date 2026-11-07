@@ -1,25 +1,36 @@
 /**
- * Builds data/{train,dev,test}.jsonl and data/stats.json from data/raw/*.tsv.
+ * Builds data/<split>/<dataset>.jsonl for every dataset (`datasets.ts`), data/manifest.json
+ * with their sizes, and data/stats.json. Training and eval sets are blends of these files,
+ * chosen when they are loaded (`blend.ts`, `load.ts`).
  *
+ * libpostal datasets (openaddresses, osm, ways, places):
  * - Each source contributes its first SOURCE_LIMITS lines (`--limit <source>=<n>`), so a raw
  *   file longer than the limit doesn't change the build.
- * - Sources are interleaved in proportion to SOURCE_WEIGHTS (libpostal.ts), so any prefix of a
- *   split mixes them in those proportions (`mix.ts`). `--mix <source>=<w>` overrides a weight.
+ * - Sources are read interleaved by SOURCE_WEIGHTS (libpostal.ts, `mix.ts`). The order decides
+ *   which source keeps a text that two of them have.
  * - Each line is refined (`refine.ts`), then either replaced by its hand-checked override in
  *   `overrides/gold.jsonl` or checked against the whole corpus (`gold.ts`). A first pass over
  *   all lines builds the corpus counts and finds the texts that overrides apply to.
- * - Exact duplicate texts are dropped. An override applies to every line with its text.
+ * - Synthetic NotAddress examples (src/data/not-address.ts) go to the junk and embedded datasets,
+ *   built from the text before noise of the address example that seeded them. An embedded
+ *   address is split with its address; a junk text by `junkSplitKey`, so variants of one name or
+ *   phone number share a split.
+ *
+ * `datasets/` datasets, after the libpostal ones, in name order:
+ * - `<name>.ts` generates `count` examples, each from an RNG seeded by the name and number. Its
+ *   `locality()` and `street()` draw from the first LOCALITY_POOL clean openaddresses and osm
+ *   address examples.
+ * - `<name>.jsonl` is read as is: no noise, labels checked.
+ *
+ * For every dataset:
+ * - Exact duplicate texts are dropped, across datasets too; the first one written wins.
  * - Splits are assigned by `splitFor` (`lines.ts`): 90% train, 5% dev, 5% test.
  * - Formatting noise (src/data/noise.ts) is added after the split is chosen, from an RNG seeded by
- *   the line, so noise never moves an address across splits and builds stay deterministic. Both
- *   the clean and the noisy text count as seen for deduplication; an example whose noisy text was
- *   already seen is written clean instead.
- * - Synthetic NotAddress examples (src/data/not-address.ts) are interleaved right after the
- *   address example that seeded them, built from its text before noise. An embedded address is
- *   split with its address; a junk text by `junkSplitKey`, so variants of one name or phone
- *   number share a split.
+ *   the example, so noise never moves an address across splits and builds stay deterministic.
+ *   Both the clean and the noisy text count as seen for deduplication; an example whose noisy
+ *   text was already seen is written clean instead.
  *
- *   node src/data/build.ts [--mix <source>=<weight> ...] [--limit <source>=<n> ...]
+ *   node src/data/build.ts [--limit <source>=<n> ...]
  *     [--noise-scale 1] [--junk-rate 0.02] [--embedded-rate 0.02]
  *
  * `--noise-scale` multiplies every rate in NOISE_RATES; 0 builds clean data.
@@ -31,8 +42,10 @@ import {
   type WriteStream,
   mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
+import { dirname, join } from "node:path";
 import type { Example } from "../types.ts";
 import {
   checkGold,
@@ -50,17 +63,32 @@ import {
   SOURCE_WEIGHTS,
   type LibpostalSource,
 } from "./libpostal.ts";
+import {
+  listDatasets,
+  pick,
+  toParts,
+  type DatasetInfo,
+  type GeneratedDataset,
+  type Part,
+} from "./datasets.ts";
 import { lineKey, refineLine, splitFor } from "./lines.ts";
+import { checked, parseLabeled } from "./labeled.ts";
 import { mixOrder } from "./mix.ts";
 import { addNoise, NOISE_NAMES, NOISE_RATES, seededRng, type NoiseName } from "./noise.ts";
 import { NOT_ADDRESS_DEFAULTS, notAddressExamples, type NotAddressOptions } from "./not-address.ts";
-import { DATA_DIR, DATA_STATS_PATH, rawPath, splitPath, type Split } from "./paths.ts";
+import {
+  DATA_DIR,
+  DATA_STATS_PATH,
+  datasetPath,
+  manifestPath,
+  rawPath,
+  type Split,
+} from "./paths.ts";
 
 const SPLITS: readonly Split[] = ["train", "dev", "test"];
 
 const { values: args } = parseArgs({
   options: {
-    mix: { type: "string", multiple: true, default: [] },
     limit: { type: "string", multiple: true, default: [] },
     "noise-scale": { type: "string", default: "1" },
     "junk-rate": { type: "string", default: String(NOT_ADDRESS_DEFAULTS.junkRate) },
@@ -82,7 +110,7 @@ const sources = (Object.keys(LIBPOSTAL_FILES) as LibpostalSource[]).filter((s) =
   existsSync(rawPath(s)),
 );
 if (sources.length === 0) throw new Error("no data/raw/*.tsv; run `pnpm data:fetch` first");
-const weights = { ...SOURCE_WEIGHTS, ...parseSourceNumbers(args.mix ?? []) };
+const weights = SOURCE_WEIGHTS;
 const limits = { ...SOURCE_LIMITS, ...parseSourceNumbers(args.limit ?? []) };
 for (const s of Object.keys(LIBPOSTAL_FILES) as LibpostalSource[]) {
   if (weights[s] > 0 && !sources.includes(s)) console.warn(`${s}: no ${rawPath(s)}; skipped`);
@@ -116,15 +144,33 @@ for (const { line } of rawLines()) {
   if (o && o.text === result.text) overrideByText.set(o.text, o);
 }
 
-mkdirSync(DATA_DIR, { recursive: true });
-const outs = Object.fromEntries(SPLITS.map((s) => [s, createWriteStream(splitPath(s))])) as Record<
-  Split,
-  WriteStream
->;
+const datasets = listDatasets();
+// Datasets removed since the last build must not linger, nor the one-file-per-split layout
+// (data/train.jsonl) of builds before datasets were stored apart.
+for (const split of SPLITS) {
+  rmSync(join(DATA_DIR, split), { recursive: true, force: true });
+  rmSync(join(DATA_DIR, `${split}.jsonl`), { force: true });
+}
+/** Output stream per split and dataset, opened on the first example written to it. */
+const outs = new Map<string, WriteStream>();
+const counts: Record<string, Record<Split, number>> = {};
+function out(split: Split, dataset: string): WriteStream {
+  const path = datasetPath(split, dataset);
+  let w = outs.get(path);
+  if (!w) {
+    mkdirSync(dirname(path), { recursive: true });
+    outs.set(path, (w = createWriteStream(path)));
+  }
+  return w;
+}
 
 const stats = {
   libpostalSnapshot: LIBPOSTAL_SNAPSHOT,
-  weights: Object.fromEntries(sources.map((s) => [s, weights[s]])),
+  datasets: Object.fromEntries(datasets.map((d) => [d.name, { kind: d.kind }])) as Record<
+    string,
+    { kind: string; description?: string }
+  >,
+  readOrderWeights: Object.fromEntries(sources.map((s) => [s, weights[s]])),
   limits: Object.fromEntries(sources.map((s) => [s, limits[s]])),
   notAddress,
   linesRead: 0,
@@ -173,7 +219,9 @@ function duplicate(source: string) {
 }
 
 function write(ex: Example, split = splitFor(ex)) {
-  outs[split].write(JSON.stringify(ex) + "\n");
+  out(split, ex.source).write(JSON.stringify(ex) + "\n");
+  const c = (counts[ex.source] ??= { train: 0, dev: 0, test: 0 });
+  c[split]++;
   stats.examples++;
   stats.bySplit[split]++;
   bump(stats.bySource, ex.source);
@@ -181,6 +229,42 @@ function write(ex: Example, split = splitFor(ex)) {
 }
 
 const seen = new Set<string>();
+
+/** Writes `clean` with noise from an RNG seeded by `noiseKey`, or clean when `noise` is false. */
+function writeNoisy(clean: Example, noiseKey: string, noise = true) {
+  const split = splitFor(clean);
+  let ex = noise ? addNoise(clean, seededRng(noiseKey), noiseRates) : clean;
+  if (ex !== clean && seen.has(ex.text)) {
+    stats.noise.collisions++;
+    ex = clean;
+  }
+  seen.add(ex.text);
+  if (ex.noise) for (const n of ex.noise) bump(stats.noise.applied, n);
+  else stats.noise.clean++;
+  write(ex, split);
+}
+
+/** Localities and street lines for `GenerateContext`, from this many clean address examples. */
+const LOCALITY_POOL = 100_000;
+const localities: Part[][] = [];
+const streets: Part[][] = [];
+const LOCALITY_LABELS = new Set(["PlaceName", "StateName", "ZipCode", "CountryName"]);
+/** Adds the locality and street line of an address example ("12 Main St" + ", Kenai, AK"). */
+function pool(ex: Example) {
+  if (localities.length >= LOCALITY_POOL) return;
+  const parts = toParts(ex.text, ex.spans);
+  const at = parts.findIndex((p) => typeof p !== "string" && p[1] === "PlaceName");
+  const gap = parts[at - 1];
+  if (at < 2 || typeof gap !== "string" || !/^[, ]+$/.test(gap)) return;
+  const tail = parts.slice(at);
+  if (!tail.every((p) => typeof p === "string" || LOCALITY_LABELS.has(p[1]))) return;
+  const street = parts.slice(0, at - 1);
+  if (!street.some((p) => typeof p !== "string" && p[1] === "StreetName")) return;
+  if (street.some((p) => typeof p !== "string" && p[1] === "NotAddress")) return;
+  localities.push([gap, ...tail]);
+  streets.push(street);
+}
+
 for (const { line, source, i } of rawLines()) {
   stats.linesRead++;
   bump(stats.linesReadBySource, source);
@@ -221,16 +305,8 @@ for (const { line, source, i } of rawLines()) {
   const clean: Example = { id: `${source}:${i}`, text: result.text, spans, source };
   const exNotes = noteList(notes);
   if (exNotes) clean.notes = exNotes;
-  const split = splitFor(clean);
-  let ex = addNoise(clean, seededRng(`noise:${line}`), noiseRates);
-  if (ex !== clean && seen.has(ex.text)) {
-    stats.noise.collisions++;
-    ex = clean;
-  }
-  seen.add(ex.text);
-  if (ex.noise) for (const n of ex.noise) bump(stats.noise.applied, n);
-  else stats.noise.clean++;
-  write(ex, split);
+  writeNoisy(clean, `noise:${line}`);
+  if (source === "openaddresses" || source === "osm") pool(clean);
   if (override) stats.overrides.examples++;
   for (const extra of notAddressExamples(clean, notAddress)) {
     if (seen.has(extra.text)) {
@@ -244,6 +320,76 @@ for (const { line, source, i } of rawLines()) {
 for (const o of overrides.values()) {
   if (overrideByText.get(o.text) !== o) console.warn(`stale override ${o.key}: ${o.text}`);
 }
-await Promise.all(SPLITS.map((s) => new Promise<void>((resolve) => outs[s].end(() => resolve()))));
+
+/** Localities indexed by their state's text, lowercased. */
+const byState = new Map<string, Part[][]>();
+for (const l of localities) {
+  const state = l.find((p) => typeof p !== "string" && p[1] === "StateName");
+  if (!state || typeof state === "string") continue;
+  const k = state[0].toLowerCase();
+  if (!byState.has(k)) byState.set(k, []);
+  byState.get(k)!.push(l);
+}
+
+/** Writes one example from a datasets/ file, unless its text was already written. */
+function writeAdded(ex: Example, noise: boolean) {
+  if (seen.has(ex.text)) return duplicate(ex.source);
+  seen.add(ex.text);
+  writeNoisy(ex, `noise:${ex.id}`, noise);
+}
+
+async function buildAdded(d: DatasetInfo) {
+  if (d.kind === "labeled") {
+    for (const ex of parseLabeled(readFileSync(d.path!, "utf8"), d.name, d.path)) {
+      writeAdded(ex, false);
+    }
+    return;
+  }
+  const def = (await import(d.path!)).default as GeneratedDataset;
+  if (typeof def?.generate !== "function" || !(def.count >= 0)) {
+    throw new Error(`${d.path}: default export must be a GeneratedDataset (src/data/datasets.ts)`);
+  }
+  if (localities.length === 0) throw new Error(`${d.name}: no libpostal localities to draw from`);
+  stats.datasets[d.name]!.description = def.description;
+  for (let i = 0; i < def.count; i++) {
+    const rng = seededRng(`${d.name}:${i}`);
+    const parts = def.generate({
+      rng,
+      locality(opts) {
+        const pools = (opts?.state ?? []).flatMap((s) => byState.get(s.toLowerCase()) ?? []);
+        return [...pick(rng, pools.length ? pools : localities)];
+      },
+      street: () => [...pick(rng, streets)],
+    });
+    if (!parts) continue;
+    const id = `${d.name}:${i}`;
+    let ex: Example;
+    try {
+      ex = { id, ...checked(parts), source: d.name };
+    } catch (e) {
+      throw new Error(`${id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    writeAdded(ex, def.noise ?? true);
+  }
+}
+
+for (const d of datasets) {
+  if (d.kind === "generated" || d.kind === "labeled") {
+    const before = stats.examples;
+    await buildAdded(d);
+    console.error(`${d.name}: ${(stats.examples - before).toLocaleString("en-US")} examples`);
+  }
+}
+
+await Promise.all(
+  [...outs.values()].map((w) => new Promise<void>((resolve) => w.end(() => resolve()))),
+);
+/** Datasets in registry order, so blends tie-break the same way on every build. */
+const manifest = {
+  datasets: Object.fromEntries(
+    datasets.filter((d) => counts[d.name]).map((d) => [d.name, counts[d.name]!]),
+  ),
+};
+writeFileSync(manifestPath(), JSON.stringify(manifest, null, 2) + "\n");
 writeFileSync(DATA_STATS_PATH, JSON.stringify(stats, null, 2) + "\n");
 console.log(JSON.stringify(stats, null, 2));

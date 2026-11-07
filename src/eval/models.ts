@@ -1,6 +1,6 @@
 /**
  * Trained-model cache shared by `pnpm eval` and the docs build: models/<impl>/<key>.bin, keyed
- * by the impl's source hash, training data hash, seed and size, next to a <key>.train.json with
+ * by the impl's source hash, training data hash (which covers the blend), seed and size, next to a <key>.train.json with
  * the training metrics and when, at which commit and on which machine they were measured.
  * Also the child-process runner and the git/machine records that runs and the cache share.
  */
@@ -69,8 +69,10 @@ export interface ModelRequest {
   impl: string;
   /** `implSourceHash(impl)`. */
   implHash: string;
-  /** Train on the first `n` examples of the train split. */
+  /** Train on the first `n` examples of the train split blended by `weights`. */
   n: number;
+  /** Dataset → weight (`resolveBlend`). */
+  weights: Record<string, number>;
   seed: number;
   /** Train even when a cached model exists. */
   retrain?: boolean;
@@ -79,8 +81,8 @@ export interface ModelRequest {
 
 /** Path of the cached model for `req`, training it first unless it is cached. */
 export async function ensureModel(req: ModelRequest) {
-  const { impl, implHash, n, seed } = req;
-  const trainHash = await hashSplit("train", n);
+  const { impl, implHash, n, seed, weights } = req;
+  const trainHash = await hashSplit("train", n, weights);
   const key = sha256([implHash, trainHash, seed, n].join("|")).slice(0, 16);
   const dir = join(MODELS_DIR, impl);
   const model = join(dir, `${key}.bin`);
@@ -98,7 +100,7 @@ export async function ensureModel(req: ModelRequest) {
     measured,
     ...(await runChild<Omit<Training, "cached" | "measured">>(
       "train",
-      { impl, split: "train", n, seed, out: model } satisfies TrainArgs,
+      { impl, split: "train", n, seed, weights, out: model } satisfies TrainArgs,
       ["--max-old-space-size=16384"],
     )),
   };

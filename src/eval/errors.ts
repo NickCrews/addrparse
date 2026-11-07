@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { hashSplit, loadExamples } from "../data/load.ts";
-import { PREDICTIONS_DIR, splitPath } from "../data/paths.ts";
+import { DATA_DIR, PREDICTIONS_DIR } from "../data/paths.ts";
 import { tokenize } from "../tokens.ts";
 import type { ScoredParse, Span } from "../types.ts";
 import { normalizeSpans, scoreExample } from "./accuracy.ts";
@@ -38,7 +38,9 @@ if (!existsSync(predPath)) throw new Error(`${predPath} missing; the run had no 
 const { split, evalExamples } = run.config;
 const examples = await loadExamples(split, evalExamples);
 if ((await hashSplit(split, evalExamples)) !== run.data.evalHash) {
-  console.log(c.yellow(`note: ${splitPath(split)} changed since this run; ids may not line up`));
+  console.log(
+    c.yellow(`note: ${split} data in ${DATA_DIR} changed since this run; ids may not line up`),
+  );
 }
 const predicted = new Map<string, Span[]>();
 const confidence = new Map<string, number>();

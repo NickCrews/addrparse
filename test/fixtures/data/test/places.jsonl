@@ -1,0 +1,4 @@
+{"id":"places:2","text":"Willistown, PA","spans":[{"start":0,"end":10,"label":"PlaceName"},{"start":12,"end":14,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
+{"id":"places:23","text":"Rowland, CA","spans":[{"start":0,"end":7,"label":"PlaceName"},{"start":9,"end":11,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
+{"id":"places:32","text":"Cuivre-Hghts, MO","spans":[{"start":0,"end":12,"label":"PlaceName"},{"start":14,"end":16,"label":"StateName"}],"source":"places"}
+{"id":"places:56","text":"Rock Creek, MS","spans":[{"start":0,"end":10,"label":"PlaceName"},{"start":12,"end":14,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}

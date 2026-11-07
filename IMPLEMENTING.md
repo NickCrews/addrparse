@@ -25,10 +25,12 @@ The repo is an eval harness built for hill-climbing parsers. Read `README.md` fi
 - `eval.config.ts`: suites and knobs.
 - `src/data/refine.ts` and `src/data/street-suffixes.ts`: lexicons usable as features.
 
-Data is built by `pnpm data` into `data/`: libpostal-derived US addresses (full addresses,
-streets with places, places alone), with seeded formatting noise (`src/data/noise.ts`) and
-synthetic `NotAddress` examples, both junk-only texts and addresses embedded in other text
-(`src/data/not-address.ts`).
+Data is built by `pnpm data` into `data/`, one file per dataset: libpostal-derived US addresses
+(full addresses, streets with places, places alone), with seeded formatting noise
+(`src/data/noise.ts`); synthetic `NotAddress` examples, both junk-only texts and addresses
+embedded in other text (`src/data/not-address.ts`); and synthetic PO boxes, rural and highway
+contract routes, general delivery, mileposts and military mail (`datasets/`). Training and eval
+sets blend them by `DATASET_WEIGHTS` (`eval.config.ts`); `--without <dataset>` trains without one.
 
 ## Loop
 

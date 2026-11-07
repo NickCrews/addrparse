@@ -1,10 +1,11 @@
-The files in this directory (train.jsonl, dev.jsonl, test.jsonl) are a database, not part of
-the MIT-licensed software in this repository.
+The files in this directory ({train,dev,test}/<dataset>.jsonl and manifest.json) are a database,
+not part of the MIT-licensed software in this repository.
 
 Contents
 --------
-600 labeled US address examples: the first 400 train, 100 dev and 100 test examples of a build of
-this repository's data pipeline. Each example records its upstream source in its `source` field:
+600 labeled US address examples: the first 400 train, 100 dev and 100 test examples of the default
+blend of a build of this repository's data pipeline, stored by dataset. Each example records its
+dataset in its `source` field:
 
 - osm, ways, places: OpenStreetMap data, © OpenStreetMap contributors.
 - openaddresses: OpenAddresses data (https://openaddresses.io) from the government sources listed
@@ -12,6 +13,9 @@ this repository's data pipeline. Each example records its upstream source in its
   including Oregon Metro (ODbL 1.0).
 - embedded: one of the above wrapped in synthetic text.
 - junk: synthetic text only (src/data/not-address.ts).
+- po-box, rural-route, highway-contract, general-delivery, milepost, military: synthetic address
+  lines (datasets/<name>.ts), most followed by the city, state and ZIP of an osm or
+  openaddresses example.
 
 All upstream lines come from libpostal's parser training data, snapshot 20170304
 (https://github.com/openvenues/libpostal; files listed in src/data/libpostal.ts).
@@ -32,7 +36,7 @@ files:
 
     pnpm install
     pnpm data:fetch            # src/data/fetch.ts: downloads the libpostal snapshot's US lines
-    pnpm data:build            # src/data/build.ts: refines labels and splits into data/
-    node src/data/fixture.ts   # copies the first examples of each split here
+    pnpm data:build            # src/data/build.ts: refines labels, generates datasets/, splits into data/
+    node src/data/fixture.ts   # copies the default blend's first examples of each split here
 
 Every step is deterministic, so this reproduces the files byte for byte.

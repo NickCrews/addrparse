@@ -1,0 +1,1 @@
+{"id":"po-box:16","text":"P O Box 40 SAN BERNARDINO, CA","spans":[{"start":0,"end":7,"label":"USPSBoxType"},{"start":8,"end":10,"label":"USPSBoxID"},{"start":11,"end":25,"label":"PlaceName"},{"start":27,"end":29,"label":"StateName"}],"source":"po-box"}

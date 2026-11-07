@@ -1,3 +1,38 @@
+import type { Blend } from "./src/data/blend.ts";
+
+/**
+ * Default share of each dataset (`src/data/datasets.ts`) in training and eval sets: every prefix
+ * of a blended split has the datasets in these proportions until one runs out. A dataset not
+ * listed here gets weight 1. The libpostal and not-address weights are in proportion to how many
+ * examples each has, so they all run out together; the synthetic address forms are each about
+ * 0.5–2% of the blend.
+ */
+export const DATASET_WEIGHTS: Record<string, number> = {
+  openaddresses: 1,
+  osm: 0.76,
+  ways: 0.17,
+  places: 0.09,
+  junk: 0.027,
+  embedded: 0.039,
+  "po-box": 0.04,
+  "rural-route": 0.02,
+  "highway-contract": 0.015,
+  "general-delivery": 0.012,
+  milepost: 0.02,
+  military: 0.012,
+};
+
+/**
+ * Named training blends for `pnpm eval <impl> --blend <name>`; see `src/data/blend.ts`. The
+ * eval set always uses the default blend.
+ */
+export const BLENDS: Record<string, Blend> = {
+  /** The libpostal-derived data alone, as before the synthetic address forms were added. */
+  "libpostal-only": { use: ["libpostal", "not-address"] },
+  /** No NotAddress examples: what abstaining costs and buys. */
+  "no-not-address": { without: ["not-address"] },
+};
+
 /**
  * Every knob of the eval harness. A suite trades thoroughness for wall time; pick one with
  * `pnpm eval <impl> --suite <name>`. Runs are only comparable within a suite.

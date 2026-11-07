@@ -12,7 +12,7 @@ import {
   toPieces,
   type NoiseName,
 } from "../src/data/noise.ts";
-import { ROOT, splitPath } from "../src/data/paths.ts";
+import { DATA_DIR, datasetPath, ROOT } from "../src/data/paths.ts";
 import type { Label } from "../src/labels.ts";
 import type { Example, Span } from "../src/types.ts";
 
@@ -288,10 +288,10 @@ const bag = (ex: { text: string; spans: Span[] }, f = (s: string) => s) =>
  * the build never adds noise to them.
  */
 function devExamples(n: number): Example[] {
-  const path = existsSync(splitPath("dev"))
-    ? splitPath("dev")
-    : join(ROOT, "test/fixtures/data/dev.jsonl");
-  const lines = readFileSync(path, "utf8").split("\n", n * 2);
+  const dir = existsSync(datasetPath("dev", "osm")) ? DATA_DIR : join(ROOT, "test/fixtures/data");
+  const lines = ["osm", "openaddresses"].flatMap((d) =>
+    readFileSync(datasetPath("dev", d, dir), "utf8").split("\n", n),
+  );
   return lines
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Example)

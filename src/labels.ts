@@ -4,6 +4,7 @@
  * from libpostal's coarser labels.
  */
 export const LABELS = {
+  AddressNumberPrefix: "Word before a milepost number: Mile, MP, Milepost (Mile 14.5 Parks Hwy)",
   AddressNumber: "House number: 123, 123A, 45-29",
   AddressNumberSuffix:
     "Letter, letter+digit or fraction as its own word after the number: 12 B, 12 1/2",
@@ -15,8 +16,10 @@ export const LABELS = {
   StreetNamePostDirectional: "Directional after the street type: Main St NE",
   OccupancyType: "Unit designator: Apt, Suite, #, Floor, / F; or a numberless level: Basement, Gf",
   OccupancyIdentifier: "Unit number: 4B, 2009",
-  USPSBoxType: "PO box designator: PO Box, P.O. Box",
-  USPSBoxID: "PO box number",
+  USPSBoxGroupType: "Route a box is on: RR, Rural Route, HC, Star Route, PSC, CMR, Unit",
+  USPSBoxGroupID: "Route number: the 2 of RR 2 Box 5",
+  USPSBoxType: "Box designator: PO Box, Box, Drawer; or General Delivery, which has no ID",
+  USPSBoxID: "Box number",
   PlaceName: "City or town",
   StateName: "State, abbreviated or spelled out",
   ZipCode: "ZIP or ZIP+4",

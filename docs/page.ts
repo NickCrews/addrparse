@@ -8,11 +8,13 @@ import { TARGET_EXACT_MATCH } from "../src/eval/accuracy.ts";
 import { HEADLINE, type Metric } from "../src/eval/headline.ts";
 import type { RunResult } from "../src/eval/results.ts";
 import type { Span } from "../src/types.ts";
+import { DATASET_WEIGHTS } from "../eval.config.ts";
 import { IMPL_NOTES } from "./impl-notes.ts";
 
 export interface DataStats {
   libpostalSnapshot: string;
-  weights: Record<string, number>;
+  /** What each dataset is; `description` is set for `datasets/` files that have one. */
+  datasets?: Record<string, { kind: string; description?: string }>;
   limits: Record<string, number>;
   notAddress: { junkRate: number; embeddedRate: number; seed: number };
   linesRead: number;
@@ -72,7 +74,10 @@ const sum = (xs: Iterable<number>) => [...xs].reduce((a, b) => a + b, 0);
 
 /** Hue of each label's highlight; app.ts reads the same values from the CSS variables. */
 export const LABEL_HUES: Record<Label, number> = Object.fromEntries(
-  LABEL_NAMES.map((l, i) => [l, l === "NotAddress" ? -1 : Math.round((i * 360) / 16)]),
+  LABEL_NAMES.map((l, i) => [
+    l,
+    l === "NotAddress" ? -1 : Math.round((i * 360) / (LABEL_NAMES.length - 1)),
+  ]),
 ) as Record<Label, number>;
 
 function table(
@@ -257,7 +262,7 @@ function trainingData(s: DataStats, suite: string): string {
   const sourceRows = [
     ...sources.map((src) => [
       code(src),
-      String(s.weights[src] ?? "–"),
+      String(DATASET_WEIGHTS[src] ?? 1),
       int(s.linesReadBySource[src]!),
       int(rejected(src)),
       int(s.duplicatesBySource[src] ?? 0),
@@ -267,8 +272,8 @@ function trainingData(s: DataStats, suite: string): string {
     ...Object.keys(s.bySource)
       .filter((src) => !sources.includes(src))
       .map((src) => [
-        `${code(src)} (synthetic)`,
-        "–",
+        `${code(src)} (${s.datasets?.[src]?.kind === "labeled" ? "labeled" : "synthetic"})`,
+        String(DATASET_WEIGHTS[src] ?? 1),
         "–",
         "–",
         int(s.duplicatesBySource[src] ?? 0),
@@ -297,9 +302,11 @@ function trainingData(s: DataStats, suite: string): string {
     .sort((a, b) => b[1] - a[1])
     .map(([r, n]) => [code(r), int(n)]);
   return `
-<p>All examples come from libpostal's parser training data (snapshot ${code(s.libpostalSnapshot)}), filtered to
-the US, relabeled into the label set above, deduplicated and split by a hash of the line. Sources are
-interleaved by weight, so every prefix of a split has the same mix.</p>
+<p>Most examples come from libpostal's parser training data (snapshot ${code(s.libpostalSnapshot)}), filtered to
+the US, relabeled into the label set above, deduplicated and split by a hash of the address. Synthetic
+datasets add address forms libpostal's data barely has: PO boxes as people write them, rural and highway
+contract routes, general delivery, mileposts and military mail. Each dataset is stored on its own, and a
+split is interleaved from them by weight when it is loaded, so every prefix of a split has the same mix.</p>
 ${table(
   ["source", "weight", "lines read", "rejected", "duplicates", "examples", "share"],
   sourceRows,
@@ -312,6 +319,9 @@ ${list([
   `${code("places")}: OpenStreetMap places alone (city, state, ZIP).`,
   `${code("junk")}: synthetic text that is not an address (placeholders, emails, phone numbers, names, ordinary words), all NotAddress; made after ${pct(s.notAddress.junkRate, 0)} of address examples.`,
   `${code("embedded")}: a real address inside other text ("Mail to … thanks"); made from ${pct(s.notAddress.embeddedRate, 0)} of address examples.`,
+  ...Object.entries(s.datasets ?? {})
+    .filter(([, d]) => d.description)
+    .map(([name, d]) => `${code(name)}: ${esc(d.description!)}.`),
 ])}
 <h3>Splits</h3>
 ${table(

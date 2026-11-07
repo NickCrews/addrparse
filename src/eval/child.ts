@@ -37,11 +37,13 @@ interface Common {
 
 export interface TrainArgs extends Common {
   seed: number;
+  /** The training blend's dataset weights. */
+  weights: Record<string, number>;
   out: string;
 }
 async function train(a: TrainArgs) {
   const impl = await importImpl(a.impl);
-  const examples = await loadExamples(a.split, a.n);
+  const examples = await loadExamples(a.split, a.n, a.weights);
   const tokens = countTokens(examples.map((e) => e.text));
   const sampler = await startRssSampler();
   const rssBefore = settle();
