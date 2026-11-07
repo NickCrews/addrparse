@@ -35,8 +35,8 @@ jobs:
       - run: pnpm data
       # Trains the in-page models for the full suite (a few minutes), then writes docs/dist/.
       # Reference parsers' demo columns need results/predictions/, which is gitignored, so the
-      # page built here has none.
-      - run: pnpm docs --suite full
+      # page built here has none. `run` is needed: bare `pnpm docs` is pnpm's own command.
+      - run: pnpm run docs --suite full
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
