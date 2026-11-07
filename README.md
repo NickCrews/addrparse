@@ -19,16 +19,17 @@ pnpm compare                       # latest run of every impl, side by side
 
 ## Commands
 
-| command                                     | does                                                                |
-| ------------------------------------------- | ------------------------------------------------------------------- |
-| `pnpm eval <impl...> [--suite quick]`       | train (or reuse cached model), measure, save, print vs previous run |
-| `  --split test`                            | score on the test split instead of dev                              |
-| `  --only accuracy,memory,latency,...`      | run a subset of steps (`throughput`, `determinism`, `curve`)        |
-| `  --retrain`                               | ignore the model cache                                              |
-| `pnpm compare [--suite quick] [--detail]`   | latest run per impl; best value per metric highlighted              |
-| `pnpm compare <impl>`                       | that impl's last two runs, with changes                             |
-| `pnpm compare <runA> <runB>`                | two runs (id, id prefix, impl name, or path)                        |
-| `pnpm errors <run> [--label X] [--slice s]` | misparsed examples as token / gold / predicted tables               |
+| command                                     | does                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `pnpm eval <impl...> [--suite quick]`       | train (or reuse cached model), measure, save, print vs previous run  |
+| `  --split test`                            | score on the test split instead of dev                               |
+| `  --only accuracy,memory,latency,...`      | run a subset of steps (`throughput`, `determinism`, `curve`)         |
+| `  --retrain`                               | ignore the model cache                                               |
+| `pnpm compare [--suite quick] [--detail]`   | latest run per impl; best value per metric highlighted               |
+| `pnpm compare <impl>`                       | that impl's last two runs, with changes                              |
+| `pnpm compare <runA> <runB>`                | two runs (id, id prefix, impl name, or path)                         |
+| `pnpm errors <run> [--label X] [--slice s]` | misparsed examples as token / gold / predicted tables                |
+| `pnpm data:override <id\|text>...`          | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels |
 
 `--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
 or red only when larger than the metric's noise threshold; smaller ones are dimmed.
@@ -103,7 +104,50 @@ suites, data or machines aren't comparable; `compare` prints a note when they di
 | `src/eval/headline.ts` | which metrics the tables show, their order, format and noise thresholds                        |
 | `src/eval/slices.ts`   | accuracy subsets                                                                               |
 | `src/data/refine.ts`   | how libpostal's labels map to the output labels                                                |
+| `src/data/gold.ts`     | corpus-level checks that reject or relabel libpostal noise refine can't see                    |
+| `overrides/gold.jsonl` | hand-checked labels for single lines                                                           |
 | `src/labels.ts`        | the label set                                                                                  |
+
+## Gold labels
+
+libpostal's labels are coarse and its text has deliberate noise (truncated and misspelled
+words), so the gold labels are derived by heuristics, in order:
+
+1. `src/data/refine.ts` splits each libpostal field into output labels, one line at a time.
+2. `src/data/gold.ts` checks the result against counts over the whole corpus: it rejects roads
+   whose type libpostal cut to one letter ("Wilmont D"), relabels misspelled types ("Raod")
+   as `StreetNamePostType`, and notes city names abbreviated beyond USPS forms ("S Diego").
+3. `overrides/gold.jsonl` replaces both for single lines, by hand.
+
+Every rule that makes a judgment call adds a note to the example's `notes`, and
+`data/stats.json` counts each note, each rejection reason, and the overrides. The
+`gold=heuristic` slice is the examples with such a note; `gold=clean` is the rest: labels no rule
+had to guess at, or hand-checked ones. Noise the rules don't recognize can still hide there. `dropped:<field>` notes (a field was removed
+from the text) don't count.
+
+### Overrides
+
+`overrides/gold.jsonl` has one JSON object per line:
+
+```json
+{"key":"4fa35de149bcebea","text":"100 WILMONT D, WAUKESHA, Wisconsin 53189","spans":[["100","AddressNumber"],["WILMONT","StreetName"],["D","StreetNamePostType"],["WAUKESHA","PlaceName"],["Wisconsin","StateName"],["53189","ZipCode"]],"why":"D is Drive truncated"}
+{"key":"851856e2a707501b","text":"1026 31st St, Ug, Apartment 2011","reject":"Ug is libpostal's German basement; no US reading"}
+```
+
+- `key`: the first 16 hex digits of the sha1 of the raw libpostal line.
+- `text`: the refined text the entry was written against, unique in the file. Overrides only change labels, never
+  text. When the line no longer refines to this text (the line is gone, or refine or rendering
+  changed), the entry is stale: it applies to nothing and `stats.overrides.stale` counts it.
+- `spans`: each span's text and label, in order; each is matched at the next whole-word
+  occurrence, and every letter and digit of `text` must be in a span. Or `reject`: why the line
+  is dropped.
+- `why`: optional note on the fix.
+
+An override applies to every line that refines to the same text, and replaces the corpus checks,
+so it can also keep a line they would reject. The example gets the note `override`.
+`pnpm data:override osm:6` (an example id, or a text substring) prints entries with the current
+labels, plus each line's split, notes and rejection on stderr; edit one, append it and rebuild.
+`pnpm test` validates the file.
 
 ## Dev vs test
 

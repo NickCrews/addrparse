@@ -14,6 +14,12 @@ export interface Example {
   spans: Span[];
   /** Which upstream file the example came from, e.g. "openaddresses" or "osm". */
   source: string;
+  /**
+   * Notes from building the gold labels (`src/data/refine.ts`, `src/data/gold.ts`), each naming a
+   * heuristic the labels rest on, e.g. "road:truncated-suffix". Exceptions: "dropped:<field>"
+   * says a field was removed from the text, and "override" that the labels were checked by hand.
+   */
+  notes?: string[];
 }
 
 /** A loaded model. `parse` must be synchronous and side-effect free. */
