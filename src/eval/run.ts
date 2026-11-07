@@ -8,6 +8,9 @@
  * Each measurement is a fresh child process (child.ts). Models are cached in
  * models/<impl>/<key>.bin, keyed by the impl's source hash, training data hash, seed and size;
  * `--retrain` ignores the cache.
+ *
+ * A reference impl (`ReferenceImpl`, e.g. usaddress) is trained elsewhere and runs out of
+ * process, so only its accuracy is measured; `--only` and `--retrain` don't apply to it.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -18,7 +21,7 @@ import { parseArgs } from "node:util";
 import { SUITES, type Suite, type SuiteName } from "../../eval.config.ts";
 import { hashSplit, loadExamples } from "../data/load.ts";
 import { MODELS_DIR, PREDICTIONS_DIR, ROOT, type Split } from "../data/paths.ts";
-import type { Example, ScoredParse } from "../types.ts";
+import type { Example, ReferenceImpl, ScoredParse, Span } from "../types.ts";
 import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
 import type {
   LatencyArgs,
@@ -28,7 +31,7 @@ import type {
   ThroughputArgs,
   TrainArgs,
 } from "./child.ts";
-import { implCodeSize, implSourceHash, listImpls } from "./impl.ts";
+import { implCodeSize, implSourceHash, importReference, listImpls } from "./impl.ts";
 import { c, comparabilityNotes, deltaTable, detailTables, sideBySideTable } from "./report.ts";
 import { loadRuns, saveRun, type RunResult } from "./results.ts";
 
@@ -175,14 +178,88 @@ function machineInfo(): RunResult["machine"] {
   };
 }
 
-async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash: string) {
-  const started = new Date();
+function newRunId(impl: string, started: Date): string {
   const local = new Date(started.getTime() - started.getTimezoneOffset() * 60_000);
-  const runId = [
+  return [
     local.toISOString().slice(0, 19).replaceAll(":", "-"),
     impl,
     suiteName + (split === "test" ? "-test" : ""),
   ].join("__");
+}
+
+/** The latest earlier run of the same impl, suite and split that measured at least `run` did. */
+function previousRun(run: RunResult): RunResult | undefined {
+  // Failing that, the latest earlier run, so `--only` runs don't become the baseline for a full one.
+  const measured = Object.keys(run.metrics) as (keyof RunResult["metrics"])[];
+  const earlier = loadRuns().filter(
+    (r) => r.impl === run.impl && r.suite === suiteName && r.config.split === split,
+  );
+  return (
+    earlier.filter((r) => measured.every((k) => r.metrics[k] !== undefined)).at(-1) ??
+    earlier.at(-1)
+  );
+}
+
+/** Scores a ReferenceImpl's predictions; its run has accuracy and nothing else. */
+async function evalReference(
+  impl: string,
+  reference: ReferenceImpl,
+  evalExamples: readonly Example[],
+  evalHash: string,
+) {
+  const started = new Date();
+  const runId = newRunId(impl, started);
+  const t0 = now();
+  log(c.bold(`${impl}`) + c.dim(` (${runId}, reference: accuracy only)`));
+  if (only || opts.retrain) log(c.yellow(`  --only and --retrain don't apply to a reference`));
+  const p = await reference.predict(
+    evalExamples.map((ex) => ex.text),
+    { log },
+  );
+  if (p.spans.length !== evalExamples.length) {
+    throw new Error(`${impl} returned ${p.spans.length} parses for ${evalExamples.length} texts`);
+  }
+  mkdirSync(PREDICTIONS_DIR, { recursive: true });
+  writeFileSync(
+    join(PREDICTIONS_DIR, `${runId}.jsonl`),
+    evalExamples.map((ex, i) => JSON.stringify({ id: ex.id, spans: p.spans[i] }) + "\n").join(""),
+  );
+  const seconds = (now() - t0) / 1000;
+  const metrics: RunResult["metrics"] = {
+    accuracy: {
+      ...scoreAll(evalExamples, p.spans),
+      parseErrors: p.parseErrors,
+      firstParseError: p.firstError,
+    },
+    reference: { seconds, info: p.info },
+  };
+  const a = metrics.accuracy!;
+  log(
+    `  accuracy: exact ${(a.exactMatch * 100).toFixed(2)}%, token ${(a.tokenAccuracy * 100).toFixed(2)}% (${secs(t0)})`,
+  );
+  if (p.parseErrors) log(c.red(`  ${p.parseErrors} parse errors, first: ${p.firstError}`));
+  const run: RunResult = {
+    runId,
+    timestamp: started.toISOString(),
+    impl,
+    suite: suiteName,
+    config,
+    git: gitInfo(),
+    implHash: implSourceHash(impl),
+    data: { trainHash: null, evalHash },
+    machine: machineInfo(),
+    metrics,
+  };
+  const previous = previousRun(run);
+  log(c.dim(`  saved ${saveRun(run)}`));
+  return { run, previous };
+}
+
+async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash: string) {
+  const reference = await importReference(impl);
+  if (reference) return evalReference(impl, reference, evalExamples, evalHash);
+  const started = new Date();
+  const runId = newRunId(impl, started);
   const tImpl = now();
   log(c.bold(`${impl}`) + c.dim(` (${runId})`));
 
@@ -316,15 +393,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     machine: machineInfo(),
     metrics,
   };
-  // Baseline: the latest earlier run that measured at least what this one did, so `--only`
-  // runs don't become the baseline for a full one; failing that, the latest earlier run.
-  const measured = Object.keys(metrics) as (keyof RunResult["metrics"])[];
-  const earlier = loadRuns().filter(
-    (r) => r.impl === impl && r.suite === suiteName && r.config.split === split,
-  );
-  const previous =
-    earlier.filter((r) => measured.every((k) => r.metrics[k] !== undefined)).at(-1) ??
-    earlier.at(-1);
+  const previous = previousRun(run);
   const path = saveRun(run);
   log(c.dim(`  saved ${path} (${secs(tImpl)})`));
   return { run, previous };

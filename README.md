@@ -60,6 +60,24 @@ serialization, size and load cost are part of what is measured. `src/tokens.ts` 
 tokenizer and `spansFromTokens` for token-level models; `impls/lookup` uses them. `impls/noop`
 returns nothing: its timings and memory are the harness's own floor.
 
+## Reference implementations
+
+`impls/usaddress` and `impls/libpostal` are existing parsers, trained elsewhere, that give the
+numbers context. Each default-exports a `ReferenceImpl` (`src/types.ts`) instead of an `Impl`: a
+`predict(texts)` that runs a Python script (`predict.py`, dependencies pinned in its inline
+metadata and `predict.py.lock`) over the whole eval set with `uv`, then maps the returned tokens
+back to character spans and to our labels (`src/eval/reference.ts`; each `index.ts` documents its
+label mapping). `pnpm eval usaddress libpostal` measures accuracy only; speed and memory of a
+subprocess aren't comparable to an in-process parse, so a reference shows `–` in those rows
+next to trained impls. Package and model versions are saved in the run's `metrics.reference`.
+
+- usaddress: needs `uv`. Its labels are ours plus a few finer ones, folded in.
+- libpostal: needs `uv` and the libpostal C library with its ~2 GB data directory
+  (`brew install libpostal`; elsewhere build it and set `LIBPOSTAL_DATA_DIR`). Its fields are
+  coarse (the whole street is `road`), so they are split into our labels by `src/data/refine.ts`,
+  the same rules that derive the gold labels. libpostal was trained on the lines our gold comes
+  from, dev and test included, so its score is an optimistic upper reference.
+
 ## Metrics
 
 Every measurement runs in a fresh `node --expose-gc` process (`src/eval/child.ts`), so JIT state
@@ -70,6 +88,7 @@ and heap from one measurement don't affect another.
 | exact match               | share of eval examples whose predicted span set equals gold. The headline number.                                             |
 | token accuracy            | share of whitespace tokens whose label matches gold                                                                           |
 | span P/R/F1               | a span counts only if start, end and label all match; also per label                                                          |
+| coarse exact match        | exact match with the street, the unit and the PO box each collapsed to one label, as libpostal has                            |
 | slices                    | exact match on subsets (`src/eval/slices.ts`), e.g. PO boxes, all-caps, junk-only, embedded, `noise=none`, one per noise type |
 | exact @ N% coverage       | exact match among the N% of examples with the highest confidence (only with confidences)                                      |
 | risk–coverage AURC        | mean error rate among the k most confident examples, over every k; lower is better                                            |

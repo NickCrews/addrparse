@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { normalizeSpans, riskCoverage, scoreAll, scoreExample } from "../src/eval/accuracy.ts";
+import {
+  coarsenSpans,
+  normalizeSpans,
+  riskCoverage,
+  scoreAll,
+  scoreExample,
+} from "../src/eval/accuracy.ts";
 import type { Label } from "../src/labels.ts";
 import type { Example, Span } from "../src/types.ts";
 
@@ -96,6 +102,30 @@ describe("scoreExample", () => {
   });
 });
 
+describe("coarsenSpans", () => {
+  it("collapses the street, unit and PO box into one span each, not across commas", () => {
+    const text = "12 N Main St, Apt # 4, Kenai";
+    const spans = at(text, [
+      ["12", "AddressNumber"],
+      ["N", "StreetNamePreDirectional"],
+      ["Main", "StreetName"],
+      ["St", "StreetNamePostType"],
+      ["Apt #", "OccupancyType"],
+      ["4", "OccupancyIdentifier"],
+      ["Kenai", "PlaceName"],
+    ]);
+    assert.deepEqual(
+      coarsenSpans(text, spans).map((s) => [text.slice(s.start, s.end), s.label]),
+      [
+        ["12", "AddressNumber"],
+        ["N Main St", "StreetName"],
+        ["Apt # 4", "OccupancyIdentifier"],
+        ["Kenai", "PlaceName"],
+      ],
+    );
+  });
+});
+
 describe("scoreAll", () => {
   const osm = example(
     "Kenai, AK",
@@ -119,6 +149,20 @@ describe("scoreAll", () => {
     assert.equal(m.span.precision, 6 / 7);
     assert.equal(m.span.recall, 6 / 7);
     assert.equal(m.invalidPredictions, 0);
+  });
+
+  it("credits a street split differently in the coarse metrics only", () => {
+    const unsplit = at(kenai.text, [
+      ["12", "AddressNumber"],
+      ["Main St", "StreetName"],
+      ["Kenai", "PlaceName"],
+      ["AK", "StateName"],
+    ]);
+    const r = scoreAll([kenai], [unsplit]);
+    assert.equal(r.exactMatch, 0);
+    assert.equal(r.coarse.exactMatch, 1);
+    assert.equal(r.coarse.tokenAccuracy, 1);
+    assert.equal(r.coarse.spanF1, 1);
   });
 
   it("reports precision and recall per label", () => {

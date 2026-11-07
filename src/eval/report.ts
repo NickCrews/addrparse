@@ -158,7 +158,14 @@ export function comparabilityNotes(runs: readonly RunResult[]): string[] {
   const differ = (f: (r: RunResult) => unknown) =>
     new Set(runs.map((r) => JSON.stringify(f(r)))).size > 1;
   if (differ((r) => r.data.evalHash)) notes.push("eval data differs: accuracy not comparable");
-  if (differ((r) => r.data.trainHash)) notes.push("training data differs");
+  const trained = runs.filter((r) => r.data.trainHash !== null);
+  if (new Set(trained.map((r) => r.data.trainHash)).size > 1) notes.push("training data differs");
+  const references = runs.filter((r) => r.metrics.reference).map((r) => r.impl);
+  if (references.length) {
+    notes.push(
+      `${[...new Set(references)].join(", ")}: reference, trained elsewhere; accuracy only`,
+    );
+  }
   if (differ((r) => r.suite)) notes.push("suites differ");
   if (differ((r) => r.machine.cpu)) notes.push("machines differ: timings not comparable");
   return notes.map((n) => c.yellow(`note: ${n}`));
