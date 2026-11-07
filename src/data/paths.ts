@@ -16,5 +16,9 @@ export const IMPLS_DIR = join(ROOT, "impls");
 export type Split = "train" | "dev" | "test";
 
 export const rawPath = (source: string) => join(RAW_DIR, `${source}.tsv`);
-export const splitPath = (split: Split) => join(DATA_DIR, `${split}.jsonl`);
+/** One dataset's examples in one split; `blend.ts` interleaves them into a training or eval set. */
+export const datasetPath = (split: Split, dataset: string, dir = DATA_DIR) =>
+  join(dir, split, `${dataset}.jsonl`);
+/** Examples per dataset and split, written by `pnpm data:build` (`load.ts` reads it). */
+export const manifestPath = (dir = DATA_DIR) => join(dir, "manifest.json");
 export const DATA_STATS_PATH = join(DATA_DIR, "stats.json");

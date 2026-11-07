@@ -5,6 +5,13 @@
  *   pnpm eval <impl...> [--suite quick] [--split dev|test]
  *                       [--only accuracy,memory,bundle,latency,throughput,determinism,curve]
  *                       [--retrain]
+ *                       [--blend <name>] [--use <dataset|tag>,...] [--without <dataset|tag>,...]
+ *                       [--mix <dataset>=<weight> ...]
+ *
+ * The blend flags choose the training set's datasets and weights (`src/data/blend.ts`; named
+ * blends are BLENDS in eval.config.ts). The eval set always uses the default blend, so runs with
+ * different training blends are scored on the same examples. A run is compared with the previous
+ * run of the same impl, suite, split and training blend.
  *
  * Each measurement is a fresh child process (child.ts). Models are cached in
  * models/<impl>/<key>.bin, keyed by the impl's source hash, training data hash, seed and size;
@@ -18,8 +25,16 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { SUITES, type Suite, type SuiteName } from "../../eval.config.ts";
-import { hashSplit, loadExamples } from "../data/load.ts";
+import { BLENDS, DATASET_WEIGHTS, SUITES, type Suite, type SuiteName } from "../../eval.config.ts";
+import {
+  blendLabel,
+  isDefaultBlend,
+  parseList,
+  parseWeights,
+  resolveBlend,
+  type Blend,
+} from "../data/blend.ts";
+import { hashSplit, loadExamples, readManifest } from "../data/load.ts";
 import { MODELS_DIR, PREDICTIONS_DIR, type Split } from "../data/paths.ts";
 import type { Example, ReferenceImpl, ScoredParse, Span } from "../types.ts";
 import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
@@ -35,7 +50,7 @@ import {
 } from "./models.ts";
 import { implCodeSize, implSourceHash, importReference, listImpls } from "./impl.ts";
 import { c, comparabilityNotes, deltaTable, detailTables, sideBySideTable } from "./report.ts";
-import { loadRuns, saveRun, type RunResult } from "./results.ts";
+import { loadRuns, saveRun, trainBlendOf, type RunResult } from "./results.ts";
 
 const STEPS = [
   "accuracy",
@@ -55,13 +70,19 @@ const { values: opts, positionals: impls } = parseArgs({
     split: { type: "string" },
     only: { type: "string" },
     retrain: { type: "boolean", default: false },
+    blend: { type: "string" },
+    use: { type: "string", multiple: true, default: [] },
+    without: { type: "string", multiple: true, default: [] },
+    mix: { type: "string", multiple: true, default: [] },
   },
 });
 
 if (impls.length === 0) {
   console.error(
     `usage: pnpm eval <impl...> [--suite ${Object.keys(SUITES).join("|")}] [--split dev|test]` +
-      ` [--only ${STEPS.join(",")}] [--retrain]\nimpls: ${listImpls().join(", ")}`,
+      ` [--only ${STEPS.join(",")}] [--retrain]` +
+      ` [--blend ${Object.keys(BLENDS).join("|")}] [--use a,b] [--without a,b] [--mix name=w]` +
+      `\nimpls: ${listImpls().join(", ")}`,
   );
   process.exit(2);
 }
@@ -88,12 +109,41 @@ const enabled = (s: Step) =>
         ? config.learningCurve.length > 0
         : true;
 
+if (opts.blend !== undefined && !Object.hasOwn(BLENDS, opts.blend)) {
+  throw new Error(`unknown blend ${opts.blend}; blends: ${Object.keys(BLENDS).join(", ")}`);
+}
+const named: Blend = opts.blend ? BLENDS[opts.blend]! : {};
+const flags: Blend = {
+  use: parseList(opts.use!),
+  without: parseList(opts.without!),
+  weights: parseWeights(opts.mix!),
+};
+const trainBlend: Blend = {
+  use: flags.use!.length ? flags.use : named.use,
+  without: [...(named.without ?? []), ...flags.without!],
+  weights: { ...named.weights, ...flags.weights },
+};
+const built = Object.keys(readManifest().datasets);
+const trainWeights = resolveBlend(trainBlend, built);
+/** "default", the named blend, or the flags; flags after a named blend are appended to it. */
+const trainBlendName = opts.blend
+  ? [opts.blend, ...(isDefaultBlend(flags) ? [] : [blendLabel(flags)])].join("+")
+  : blendLabel(trainBlend);
+
 const log = (msg: string) => process.stderr.write(msg + "\n");
 const now = () => performance.now();
 const secs = (t0: number) => `${((now() - t0) / 1000).toFixed(1)}s`;
 
 const ensureModel = (impl: string, implHash: string, n: number) =>
-  ensureCachedModel({ impl, implHash, n, seed: config.seed, retrain: opts.retrain, log });
+  ensureCachedModel({
+    impl,
+    implHash,
+    n,
+    seed: config.seed,
+    weights: trainWeights,
+    retrain: opts.retrain,
+    log,
+  });
 
 /** Predicts the eval set into `out` and returns the predictions in eval order. */
 async function predict(impl: string, model: string, out: string, examples: readonly Example[]) {
@@ -134,6 +184,7 @@ function newRunId(impl: string, started: Date): string {
     local.toISOString().slice(0, 19).replaceAll(":", "-"),
     impl,
     suiteName + (split === "test" ? "-test" : ""),
+    ...(trainBlendName === "default" ? [] : [trainBlendName.replace(/[^\w.,=+-]/g, "_")]),
   ].join("__");
 }
 
@@ -142,7 +193,11 @@ function previousRun(run: RunResult): RunResult | undefined {
   // Failing that, the latest earlier run, so `--only` runs don't become the baseline for a full one.
   const measured = Object.keys(run.metrics) as (keyof RunResult["metrics"])[];
   const earlier = loadRuns().filter(
-    (r) => r.impl === run.impl && r.suite === suiteName && r.config.split === split,
+    (r) =>
+      r.impl === run.impl &&
+      r.suite === suiteName &&
+      r.config.split === split &&
+      trainBlendOf(r) === trainBlendOf(run),
   );
   return (
     earlier.filter((r) => measured.every((k) => r.metrics[k] !== undefined)).at(-1) ??
@@ -309,6 +364,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
         split: "train",
         n: config.trainExamples,
         seed: config.seed,
+        weights: trainWeights,
         out: again,
       } satisfies TrainArgs,
       ["--max-old-space-size=16384"],
@@ -355,7 +411,12 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     config,
     git: gitInfo(),
     implHash,
-    data: { trainHash: main.trainHash, evalHash },
+    data: {
+      trainHash: main.trainHash,
+      evalHash,
+      ...(trainBlendName === "default" ? {} : { trainBlend: trainBlendName }),
+      trainWeights,
+    },
     machine,
     metrics,
   };
@@ -373,6 +434,19 @@ log(
       `eval ${config.evalExamples.toLocaleString("en-US")} ${split}`,
   ),
 );
+const unweighted = built.filter((d) => !Object.hasOwn(DATASET_WEIGHTS, d));
+if (unweighted.length) {
+  log(c.dim(`datasets without a weight in DATASET_WEIGHTS, so weight 1: ${unweighted.join(", ")}`));
+}
+if (trainBlendName !== "default") {
+  const share = Object.values(trainWeights).reduce((a, b) => a + b, 0);
+  log(
+    `training blend ${c.bold(trainBlendName)}: ` +
+      Object.entries(trainWeights)
+        .map(([d, w]) => `${d} ${((w / share) * 100).toFixed(1)}%`)
+        .join(", "),
+  );
+}
 
 const done: { run: RunResult; previous?: RunResult }[] = [];
 let failed = false;

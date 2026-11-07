@@ -1,0 +1,64 @@
+{
+  "datasets": {
+    "openaddresses": {
+      "train": 184,
+      "dev": 48,
+      "test": 48
+    },
+    "osm": {
+      "train": 139,
+      "dev": 37,
+      "test": 37
+    },
+    "ways": {
+      "train": 31,
+      "dev": 8,
+      "test": 8
+    },
+    "places": {
+      "train": 16,
+      "dev": 4,
+      "test": 4
+    },
+    "junk": {
+      "train": 4,
+      "dev": 1,
+      "test": 1
+    },
+    "embedded": {
+      "train": 7,
+      "dev": 1,
+      "test": 1
+    },
+    "general-delivery": {
+      "train": 2,
+      "dev": 0,
+      "test": 0
+    },
+    "highway-contract": {
+      "train": 2,
+      "dev": 0,
+      "test": 0
+    },
+    "milepost": {
+      "train": 3,
+      "dev": 0,
+      "test": 0
+    },
+    "military": {
+      "train": 2,
+      "dev": 0,
+      "test": 0
+    },
+    "po-box": {
+      "train": 7,
+      "dev": 1,
+      "test": 1
+    },
+    "rural-route": {
+      "train": 3,
+      "dev": 0,
+      "test": 0
+    }
+  }
+}

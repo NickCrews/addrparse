@@ -5,7 +5,7 @@
 import { LABEL_NAMES } from "../labels.ts";
 import { TARGET_EXACT_MATCH } from "./accuracy.ts";
 import { HEADLINE, type Metric } from "./headline.ts";
-import type { RunResult } from "./results.ts";
+import { trainBlendOf, type RunResult } from "./results.ts";
 import { SLICES } from "./slices.ts";
 
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -172,7 +172,12 @@ export function comparabilityNotes(runs: readonly RunResult[]): string[] {
     new Set(runs.map((r) => JSON.stringify(f(r)))).size > 1;
   if (differ((r) => r.data.evalHash)) notes.push("eval data differs: accuracy not comparable");
   const trained = runs.filter((r) => r.data.trainHash !== null);
-  if (new Set(trained.map((r) => r.data.trainHash)).size > 1) notes.push("training data differs");
+  if (new Set(trained.map((r) => r.data.trainHash)).size > 1) {
+    const blends = [...new Set(trained.map(trainBlendOf))];
+    notes.push(
+      blends.length > 1 ? `training blends differ: ${blends.join(", ")}` : "training data differs",
+    );
+  }
   const references = runs.filter((r) => r.metrics.reference).map((r) => r.impl);
   if (references.length) {
     notes.push(

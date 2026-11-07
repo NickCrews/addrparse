@@ -2,6 +2,7 @@
  * Subsets of the eval set that accuracy is also reported on. Add a slice by appending here;
  * every run reports every slice, so slices also show where a change helped or hurt.
  */
+import { listDatasets } from "../data/datasets.ts";
 import { NOISE_NAMES } from "../data/noise.ts";
 import type { Example } from "../types.ts";
 
@@ -23,14 +24,17 @@ const heuristicGold = (ex: Example) =>
   (ex.notes ?? []).some((n) => !n.startsWith("dropped:") && n !== "override");
 
 export const SLICES: readonly Slice[] = [
-  { name: "source=openaddresses", test: (ex) => ex.source === "openaddresses" },
-  { name: "source=osm", test: (ex) => ex.source === "osm" },
-  { name: "source=ways", test: (ex) => ex.source === "ways" },
-  { name: "source=places", test: (ex) => ex.source === "places" },
+  // One per dataset; junk and embedded have the junk-only and embedded slices below.
+  ...listDatasets()
+    .filter((d) => d.kind !== "not-address")
+    .map((d) => ({ name: `source=${d.name}`, test: (ex: Example) => ex.source === d.name })),
   { name: "street-address", test: has("AddressNumber") },
   { name: "no-street", test: (ex) => !has("StreetName")(ex) && !has("USPSBoxID")(ex) },
   { name: "unit", test: has("OccupancyIdentifier") },
   { name: "po-box", test: has("USPSBoxID") },
+  { name: "box-route", test: has("USPSBoxGroupType") },
+  { name: "general-delivery", test: (ex) => has("USPSBoxType")(ex) && !has("USPSBoxID")(ex) },
+  { name: "milepost", test: has("AddressNumberPrefix") },
   { name: "pre-type", test: has("StreetNamePreType") },
   { name: "post-directional", test: has("StreetNamePostDirectional") },
   { name: "not-address", test: has("NotAddress") },

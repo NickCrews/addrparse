@@ -1,0 +1,4 @@
+{"id":"places:89","text":"IA","spans":[{"start":0,"end":2,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
+{"id":"places:114","text":"Upr Mill, PA","spans":[{"start":0,"end":8,"label":"PlaceName"},{"start":10,"end":12,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
+{"id":"places:126","text":"Michigan-Settlement, ME","spans":[{"start":0,"end":19,"label":"PlaceName"},{"start":21,"end":23,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
+{"id":"places:140","text":"Buck-Settlement, N Y, United States","spans":[{"start":0,"end":15,"label":"PlaceName"},{"start":17,"end":20,"label":"StateName"},{"start":22,"end":35,"label":"CountryName"}],"source":"places"}

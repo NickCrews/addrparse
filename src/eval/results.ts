@@ -19,8 +19,17 @@ export interface RunResult {
    * externally installed parser, recorded in `metrics.reference.info`.
    */
   implHash: string;
-  /** `trainHash` is null for a reference impl, which is trained elsewhere. */
-  data: { trainHash: string | null; evalHash: string };
+  /**
+   * `trainHash` is null for a reference impl, which is trained elsewhere. `trainBlend` names the
+   * training blend (`blendLabel`; absent means "default") and `trainWeights` its resolved
+   * weights; the eval set always uses the default blend.
+   */
+  data: {
+    trainHash: string | null;
+    evalHash: string;
+    trainBlend?: string;
+    trainWeights?: Record<string, number>;
+  };
   machine: {
     cpu: string;
     cores: number;
@@ -108,6 +117,9 @@ export function saveRun(run: RunResult): string {
   writeFileSync(path, JSON.stringify(run, null, 2) + "\n");
   return path;
 }
+
+/** The run's training blend label; runs from before blends existed trained on the default. */
+export const trainBlendOf = (r: RunResult) => r.data.trainBlend ?? "default";
 
 /** All saved runs, oldest first. */
 export function loadRuns(): RunResult[] {

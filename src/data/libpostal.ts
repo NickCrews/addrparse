@@ -33,10 +33,9 @@ export const SOURCE_LIMITS: Record<LibpostalSource, number> = {
 };
 
 /**
- * Relative share of each source among the lines build.ts reads; override with
- * `--mix <source>=<w>`. Any prefix of the lines read has these proportions until a source runs
- * out; 0 leaves it out. Examples differ from lines by rejects and duplicates, which vary by source
- * (stats.json has both per source).
+ * Relative share of each source among the lines build.ts reads, in the order it reads them: when
+ * two sources have the same text, the one read first keeps it. Each source is written to its own
+ * dataset, so these don't set the training mix; `DATASET_WEIGHTS` in eval.config.ts does.
  */
 export const SOURCE_WEIGHTS: Record<LibpostalSource, number> = {
   openaddresses: 1,
@@ -49,7 +48,7 @@ export function isSource(s: string): s is LibpostalSource {
   return Object.hasOwn(LIBPOSTAL_FILES, s);
 }
 
-/** Parses `source=number` pairs, as given to `--limit` and `--mix`. */
+/** Parses `source=number` pairs, as given to `--limit`. */
 export function parseSourceNumbers(
   pairs: readonly string[],
 ): Partial<Record<LibpostalSource, number>> {

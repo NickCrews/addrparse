@@ -16,12 +16,12 @@ import { parseArgs } from "node:util";
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
 import { SUITES, type SuiteName } from "../eval.config.ts";
-import { hashSplit, loadExamples } from "../src/data/load.ts";
+import { defaultWeights, hashSplit, loadExamples } from "../src/data/load.ts";
 import { DATA_STATS_PATH, PREDICTIONS_DIR, ROOT } from "../src/data/paths.ts";
 import { scoreExample } from "../src/eval/accuracy.ts";
 import { implSourceHash, listImpls } from "../src/eval/impl.ts";
 import { ensureModel, gitInfo } from "../src/eval/models.ts";
-import { loadRuns, type RunResult } from "../src/eval/results.ts";
+import { loadRuns, trainBlendOf, type RunResult } from "../src/eval/results.ts";
 import { LABEL_NAMES } from "../src/labels.ts";
 import { asScoredParse, type ScoredParse, type Span } from "../src/types.ts";
 import { pickDemo, type ModelPredictions } from "./demo.ts";
@@ -49,7 +49,12 @@ const log = (m: string) => process.stderr.write(m + "\n");
 const impls = listImpls().filter((i) => !SKIP.has(i));
 const latest = new Map<string, RunResult>();
 for (const r of loadRuns()) {
-  if (r.suite === suite && r.config.split === "dev" && impls.includes(r.impl))
+  if (
+    r.suite === suite &&
+    r.config.split === "dev" &&
+    impls.includes(r.impl) &&
+    trainBlendOf(r) === "default"
+  )
     latest.set(r.impl, r);
 }
 
@@ -69,7 +74,14 @@ for (const impl of Object.keys(LOADERS)) {
   if (!impls.includes(impl)) continue;
   log(`${impl}: model for ${suite} (${config.trainExamples} examples, seed ${config.seed})`);
   const implHash = implSourceHash(impl);
-  const m = await ensureModel({ impl, implHash, n: config.trainExamples, seed: config.seed, log });
+  const m = await ensureModel({
+    impl,
+    implHash,
+    n: config.trainExamples,
+    seed: config.seed,
+    weights: defaultWeights(),
+    log,
+  });
   const bytes = readFileSync(m.model);
   const gz = gzipSync(bytes, { level: 9 });
   embedded.push({ impl, gzipBase64: gz.toString("base64") });

@@ -395,6 +395,23 @@ describe("refinePoBox", () => {
     ]);
   });
 
+  it("splits a box on a route into route and box", () => {
+    assert.deepEqual(refinePoBox(["RR", "2", "Box", "5A"], []), [
+      "USPSBoxGroupType",
+      "USPSBoxGroupID",
+      "USPSBoxType",
+      "USPSBoxID",
+    ]);
+    assert.deepEqual(refinePoBox(["Rural", "Route", "2,", "Box", "#", "5"], []), [
+      "USPSBoxGroupType",
+      "USPSBoxGroupType",
+      "USPSBoxGroupID",
+      "USPSBoxType",
+      "USPSBoxType",
+      "USPSBoxID",
+    ]);
+  });
+
   it("notes a box with no ID", () => {
     const notes: string[] = [];
     assert.deepEqual(refinePoBox(["P.O.", "Box"], notes), ["USPSBoxType", "USPSBoxType"]);

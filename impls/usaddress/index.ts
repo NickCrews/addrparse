@@ -6,9 +6,7 @@
  *
  * | usaddress                                   | here                                       |
  * | ------------------------------------------- | ------------------------------------------ |
- * | AddressNumberPrefix                         | AddressNumber                              |
  * | SubaddressType, SubaddressIdentifier        | OccupancyType, OccupancyIdentifier         |
- * | USPSBoxGroupType, USPSBoxGroupID            | USPSBoxType, USPSBoxID ("RR 2" of "RR 2 Box 5") |
  * | "#" tagged an identifier (Occupancy, Subaddress, USPSBox) | the matching type, as our gold labels "#" |
  * | BuildingName, LandmarkName, CornerOf,       | no label                                   |
  * | IntersectionSeparator, Recipient            |                                            |
@@ -26,11 +24,8 @@ import {
 import type { ReferenceImpl } from "../../src/types.ts";
 
 const MAP: Record<string, Label | undefined> = {
-  AddressNumberPrefix: "AddressNumber",
   SubaddressType: "OccupancyType",
   SubaddressIdentifier: "OccupancyIdentifier",
-  USPSBoxGroupType: "USPSBoxType",
-  USPSBoxGroupID: "USPSBoxID",
   BuildingName: undefined,
   LandmarkName: undefined,
   CornerOf: undefined,

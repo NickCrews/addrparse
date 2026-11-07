@@ -12,26 +12,28 @@ Requires Node 24+ (TypeScript runs directly via type stripping).
 
 ```sh
 pnpm install
-pnpm data                          # download libpostal training data, build data/{train,dev,test}.jsonl
+pnpm data                          # download libpostal training data, build data/<split>/<dataset>.jsonl
 pnpm eval lookup --suite smoke     # train + measure the lookup baseline, print results
 pnpm compare                       # latest run of every impl, side by side
 ```
 
 ## Commands
 
-| command                                           | does                                                                    |
-| ------------------------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm eval <impl...> [--suite quick]`             | train (or reuse cached model), measure, save, print vs previous run     |
-| `  --split test`                                  | score on the test split instead of dev                                  |
-| `  --only accuracy,memory,bundle,...`             | run a subset of steps (`latency`, `throughput`, `determinism`, `curve`) |
-| `  --retrain`                                     | ignore the model cache                                                  |
-| `pnpm compare [--suite quick] [--detail]`         | latest run per impl; best value per metric highlighted                  |
-| `pnpm compare <impl>`                             | that impl's last two runs, with changes                                 |
-| `pnpm compare <runA> <runB>`                      | two runs (id, id prefix, impl name, or path)                            |
-| `pnpm errors <run> [--label X] [--slice s]`       | misparsed examples as token / gold / predicted tables                   |
-| `pnpm noise <impl...> [--suite quick] [--last 5]` | run-to-run spread of each metric vs its noise threshold                 |
-| `pnpm data:override <id\|text>...`                | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels    |
-| `pnpm docs [--suite full]`                        | user docs as one offline HTML file, `docs/dist/index.html`              |
+| command                                            | does                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `pnpm eval <impl...> [--suite quick]`              | train (or reuse cached model), measure, save, print vs previous run       |
+| `  --split test`                                   | score on the test split instead of dev                                    |
+| `  --only accuracy,memory,bundle,...`              | run a subset of steps (`latency`, `throughput`, `determinism`, `curve`)   |
+| `  --retrain`                                      | ignore the model cache                                                    |
+| `  --without synthetic` / `--use libpostal,po-box` | train without / only on these datasets or tags (see Training data)        |
+| `  --mix po-box=0.2` / `--blend libpostal-only`    | change a dataset's training weight / train on a named blend               |
+| `pnpm compare [--suite quick] [--detail]`          | latest run per impl and training blend; best value per metric highlighted |
+| `pnpm compare <impl>`                              | that impl's last two runs, with changes                                   |
+| `pnpm compare <runA> <runB>`                       | two runs (id, id prefix, impl name, or path)                              |
+| `pnpm errors <run> [--label X] [--slice s]`        | misparsed examples as token / gold / predicted tables                     |
+| `pnpm noise <impl...> [--suite quick] [--last 5]`  | run-to-run spread of each metric vs its noise threshold                   |
+| `pnpm data:override <id\|text>...`                 | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels      |
+| `pnpm docs [--suite full]`                         | user docs as one offline HTML file, `docs/dist/index.html`                |
 
 `--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
 or red only when larger than the metric's noise threshold; smaller ones are dimmed.
@@ -152,15 +154,49 @@ Above the core count, other processes competed for the CPU: `pnpm eval` and `pnp
 A run is compared against the previous run of the same impl, suite and split. Runs from different
 suites, data or machines aren't comparable; `compare` prints a note when they differ.
 
+## Training data
+
+`pnpm data:build` writes each dataset on its own, `data/<split>/<dataset>.jsonl`, with their sizes
+in `data/manifest.json`. A training or eval set is a blend: the datasets interleaved by weight
+when the split is loaded (`src/data/blend.ts`), so every prefix of a blended split has the same
+mix. Default weights are `DATASET_WEIGHTS` in `eval.config.ts`.
+
+| dataset                                     | tag           | what                                                       |
+| ------------------------------------------- | ------------- | ---------------------------------------------------------- |
+| `openaddresses`, `osm`, `ways`, `places`    | `libpostal`   | libpostal's US training lines, relabeled (`src/data/`)     |
+| `junk`, `embedded`                          | `not-address` | text that is not an address, alone or around one           |
+| `po-box`, `rural-route`, `highway-contract` | `synthetic`   | PO Box 12; RR 2 Box 123; HC 60 Box 4321                    |
+| `general-delivery`, `milepost`, `military`  | `synthetic`   | General Delivery; Mile 14.5 Parks Hwy; PSC 3 Box 12 APO AE |
+| `datasets/<name>.jsonl`                     | `labeled`     | your own hand-labeled examples                             |
+| `datasets/<name>.ts`                        | `synthetic`   | your own generator                                         |
+
+The synthetic datasets cover physical and mailing address forms that libpostal's data barely has:
+PO boxes, rural and highway contract routes (`USPSBoxGroupType`, `USPSBoxGroupID`), general
+delivery (`USPSBoxType` with no ID), mileposts (`AddressNumberPrefix`) and military mail. Most are followed by the city, state and ZIP of a real
+libpostal address. `datasets/README.md` has the file formats for adding a dataset.
+
+The blend flags of `pnpm eval` change only the training set; the eval set is always the default
+blend, so every run is scored on the same examples. Each dataset has a `source=<dataset>` slice.
+A run on another blend gets the blend in its id (`…__crf__full__without=synthetic`), is compared
+with earlier runs on the same blend, and is its own column (`crf@without=synthetic`) in
+`pnpm compare`. Named blends are `BLENDS` in `eval.config.ts`.
+
+```sh
+pnpm eval crf --without synthetic        # what the synthetic address forms buy
+pnpm eval crf --without po-box,military  # leave out two datasets
+pnpm eval crf --mix milepost=0.1         # five times the default milepost share
+```
+
 ## Where to tweak
 
-| file                                                                                            | controls                                                                                       |
-| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `eval.config.ts`                                                                                | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve |
-| `src/eval/headline.ts`                                                                          | which metrics the tables show, their order, format and noise thresholds (`pnpm noise`)         |
-| `src/eval/slices.ts`                                                                            | accuracy subsets                                                                               |
-| `src/data/refine.ts`                                                                            | how libpostal's labels map to the output labels                                                |
-| `src/labels.ts`                                                                                 | the label set                                                                                  |
+| file                                                                                            | controls                                                                                                                         |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `eval.config.ts`                                                                                | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve; dataset weights and named blends |
+| `datasets/`                                                                                     | added datasets: generators (`.ts`) and hand-labeled examples (`.jsonl`)                                                          |
+| `src/eval/headline.ts`                                                                          | which metrics the tables show, their order, format and noise thresholds (`pnpm noise`)                                           |
+| `src/eval/slices.ts`                                                                            | accuracy subsets                                                                                                                 |
+| `src/data/refine.ts`                                                                            | how libpostal's labels map to the output labels                                                                                  |
+| `src/labels.ts`                                                                                 | the label set                                                                                                                    |
 | `pnpm data:override osm:6` (an example id, or a text substring) prints entries with the current |
 
 ## Dev vs test
@@ -207,7 +243,10 @@ Constitution); `LICENSE` carries its notice. The CI fixture `test/fixtures/data/
 code: it is under ODbL 1.0, with attribution and the method of making it in
 `test/fixtures/data/LICENSE`.
 
-The training data is libpostal's parser training data (2017-03-04 snapshot), which
+The synthetic datasets in `datasets/` are generated by this repo's code, but most of their
+examples end in a city, state and ZIP copied from a libpostal example, so they are as much a
+Derivative Database as the rest. The libpostal data is libpostal's parser training data
+(2017-03-04 snapshot), which
 [libpostal's README](https://github.com/openvenues/libpostal) lists as:
 
 | file (`src/data/libpostal.ts`)                    | from          | license                                                    |

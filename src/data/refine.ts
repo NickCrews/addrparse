@@ -12,7 +12,7 @@
  * | road                 | StreetNamePreModifier, StreetNamePre/PostDirectional,             |
  * |                      | StreetNamePre/PostType, StreetName                                |
  * | unit, level          | OccupancyType, OccupancyIdentifier                                |
- * | po_box               | USPSBoxType, USPSBoxID                                            |
+ * | po_box               | USPSBoxGroupType, USPSBoxGroupID, USPSBoxType, USPSBoxID          |
  * | city                 | PlaceName                                                         |
  * | state                | StateName                                                         |
  * | postcode             | ZipCode                                                           |
@@ -479,12 +479,31 @@ export function refineHouseNumber(tokens: readonly string[], notes: string[]): L
   return labels;
 }
 
+/** Box designators that follow a route: the "Box" of "RR 2 Box 5". */
+const BOX_WORDS = new Set(["box", "bx", "drawer"]);
+
 /**
  * Tokens before the first one containing a digit are USPSBoxType and the rest USPSBoxID
- * ("P.O. Box # 12 B"). Without a digit, a final single letter is the ID ("P O B A").
+ * ("P.O. Box # 12 B"). Without a digit, a final single letter is the ID ("P O B A"). When a box
+ * word follows the first number, the box is on a route: the tokens before it are
+ * USPSBoxGroupType and USPSBoxGroupID ("RR 2 Box 5", "PSC 3 Box 1234").
  */
 export function refinePoBox(tokens: readonly string[], notes: string[]): Label[] {
   let k = tokens.findIndex((tok) => /\d/.test(tok));
+  const box = k > 0 ? tokens.findIndex((tok, n) => n > k && BOX_WORDS.has(norm(tok))) : -1;
+  if (box > 0) {
+    const id = tokens.findIndex((tok, n) => n > box && /\d/.test(tok));
+    const end = id === -1 ? tokens.length : id;
+    return tokens.map((_, n) =>
+      n < k
+        ? "USPSBoxGroupType"
+        : n < box
+          ? "USPSBoxGroupID"
+          : n < end
+            ? "USPSBoxType"
+            : "USPSBoxID",
+    );
+  }
   if (k === -1) {
     k = tokens.length;
     if (tokens.length >= 2 && /^\p{L}$/u.test(norm(tokens.at(-1)!))) k--;

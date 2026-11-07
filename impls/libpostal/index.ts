@@ -9,7 +9,8 @@
  * libpostal's fields are coarse (the whole street is `road`), so each field is split into our
  * labels by the same rules that derive the gold labels from libpostal's training data
  * (src/data/refine.ts): `road` → StreetNamePre/PostDirectional, StreetNamePre/PostType,
- * StreetName; `unit`, `level` → OccupancyType/Identifier; `po_box` → USPSBoxType/ID. The fine
+ * StreetName; `unit`, `level` → OccupancyType/Identifier; `po_box` → USPSBoxGroupType/ID,
+ * USPSBoxType/ID. The fine
  * labels therefore score libpostal plus those rules; the coarse metrics score libpostal alone.
  * Fields our gold removes from the text (suburb, house, ...) get no label.
  */
