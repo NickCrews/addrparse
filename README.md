@@ -116,6 +116,7 @@ suites, data or machines aren't comparable; `compare` prints a note when they di
 | `eval.config.ts`          | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve                                                     |
 | `src/eval/headline.ts`    | which metrics the tables show, their order, format and noise thresholds                                                                            |
 | `src/eval/slices.ts`      | accuracy subsets                                                                                                                                   |
+| `src/data/libpostal.ts`   | sources, US lines fetched per source (`--limit`), their mix in the splits (`--mix`)                                                                |
 | `src/data/refine.ts`      | how libpostal's labels map to the output labels                                                                                                    |
 | `src/data/noise.ts`       | formatting noise added to rendered examples (newlines, "Apt4", typos, …) and its rates; `node src/data/build.ts --noise-scale 0` builds clean data |
 | `src/data/not-address.ts` | synthetic NotAddress examples; rates also via `pnpm data:build --junk-rate R --embedded-rate R`                                                    |

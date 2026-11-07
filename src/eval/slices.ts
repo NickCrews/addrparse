@@ -25,6 +25,8 @@ const heuristicGold = (ex: Example) =>
 export const SLICES: readonly Slice[] = [
   { name: "source=openaddresses", test: (ex) => ex.source === "openaddresses" },
   { name: "source=osm", test: (ex) => ex.source === "osm" },
+  { name: "source=ways", test: (ex) => ex.source === "ways" },
+  { name: "source=places", test: (ex) => ex.source === "places" },
   { name: "street-address", test: has("AddressNumber") },
   { name: "no-street", test: (ex) => !has("StreetName")(ex) && !has("USPSBoxID")(ex) },
   { name: "unit", test: has("OccupancyIdentifier") },
