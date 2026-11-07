@@ -37,8 +37,6 @@ const { spans, confidence } = parse(
 npm install addrparse
 ```
 
-`parse(text: string): { spans: Span[]; confidence: number }`
-
 - Spans are character ranges `[start, end)` of the input, sorted and non-overlapping, with
   `text === input.slice(start, end)`. Spaces and commas between them have no label.
 - A label can occur more than once, e.g. two `OccupancyType` spans in "Apt 4B Floor 2".
