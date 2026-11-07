@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ForwardBackward } from "../impls/crf/forward-backward.ts";
-import { Features, Tokens } from "../impls/crf/features.ts";
+import {
+  Features,
+  LEX_FUZZY_OCCUPANCY,
+  LEX_FUZZY_PRE_TYPE,
+  LEX_FUZZY_STATE_WORD,
+  LEX_FUZZY_SUFFIX,
+  Tokens,
+  fuzzyBits,
+} from "../impls/crf/features.ts";
 import impl from "../impls/crf/index.ts";
 import {
   CrfParser,
@@ -103,6 +111,48 @@ describe("Features", () => {
     assert.deepEqual(feats("12 Main St"), feats("12 Main St"));
     assert.notDeepEqual(feats("12 Main St"), feats("12 Main St, Kenai"));
     assert.ok(feats("12 Main St").every((f) => f !== 0));
+  });
+});
+
+describe("fuzzyBits", () => {
+  const bits = (word: string) => fuzzyBits(word, 0, word.length);
+
+  it("matches state words with a deleted, inserted, replaced or transposed letter", () => {
+    for (const w of ["Vermnt", "Vermonnt", "Vermint", "Vremont", "Alsaka", "Ohoi", "Texs"]) {
+      assert.equal(bits(w) & LEX_FUZZY_STATE_WORD, LEX_FUZZY_STATE_WORD, w);
+    }
+  });
+
+  it("allows two edits in state words of 7+ letters", () => {
+    for (const w of ["vermn", "Washingotn", "Pensylvana"]) {
+      assert.equal(bits(w) & LEX_FUZZY_STATE_WORD, LEX_FUZZY_STATE_WORD, w);
+    }
+    // "texas" has 5 letters, so one edit only.
+    assert.equal(bits("Tesa") & LEX_FUZZY_STATE_WORD, 0);
+  });
+
+  it("matches street suffixes of 4+ letters", () => {
+    for (const w of ["Stret", "Avneue", "Raod", "Boulevrd"]) {
+      assert.equal(bits(w) & LEX_FUZZY_SUFFIX, LEX_FUZZY_SUFFIX, w);
+    }
+  });
+
+  it("matches street pre-types and unit types", () => {
+    assert.equal(bits("Higway") & LEX_FUZZY_PRE_TYPE, LEX_FUZZY_PRE_TYPE);
+    assert.equal(bits("Interstat") & LEX_FUZZY_PRE_TYPE, LEX_FUZZY_PRE_TYPE);
+    assert.equal(bits("Apartmnet") & LEX_FUZZY_OCCUPANCY, LEX_FUZZY_OCCUPANCY);
+    assert.equal(bits("Suiet") & LEX_FUZZY_OCCUPANCY, LEX_FUZZY_OCCUPANCY);
+  });
+
+  it("needs the first letter to match, 4+ letters and letters only", () => {
+    for (const w of ["Xermont", "Oio", "Verm0nt", "Anchorage", "Springfield"]) {
+      assert.equal(bits(w), 0, w);
+    }
+  });
+
+  it("reads only the given range of the text", () => {
+    const text = "Burlington, Vermnt 05401";
+    assert.equal(fuzzyBits(text, 12, 18), LEX_FUZZY_STATE_WORD);
   });
 });
 

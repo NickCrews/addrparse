@@ -14,7 +14,8 @@ export const IMPL_NOTES: Record<string, ImplNotes> = {
       "Splits the text on whitespace and labels each token. Each token gets hashed features of " +
       "itself and its neighbours: lowercased word, character shape, prefixes and suffixes, " +
       "position, and membership in lexicons of street types, directionals, unit types and state " +
-      "codes. Trained by stochastic gradient descent on log-likelihood with an L1 penalty, which " +
+      "codes. A word that is a letter or two off a state name, street type, pre-type or unit type " +
+      "(vermn, Stret, Higway) gets a fuzzy-match feature of its own. Trained by stochastic gradient descent on log-likelihood with an L1 penalty, which " +
       "sets most weights to zero; the rest are stored as 16-bit integers. Parsing is Viterbi " +
       "decoding over typed arrays. The confidence is the probability of the chosen labeling, " +
       "from forward-backward.",

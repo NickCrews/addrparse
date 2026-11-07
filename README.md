@@ -5,15 +5,17 @@ The name is NER (named-entity recognition) + address.
 US address parsing, ready for production:
 
 - **Run anywhere:** Pure javascript/typescript, no dependencies
-- **Accurate:** 99.30% of held-out test addresses parsed exactly right, 99.81% of words
+- **Accurate:** 99.29% of held-out test addresses parsed exactly right, 99.81% of words
   labeled right.
-- **Small and fast:** ~350 KB gzipped including the model, ~100k/sec, nothing to download or set up.
+- **Small and fast:** ~370 KB gzipped including the model, ~100k/sec, nothing to download or set up.
 - **Comprehensive:** Any US physical or mailing address: street addresses, PO boxes, rural and highway contract routes, general
   delivery, mileposts and military mail.
 - **Says how sure it is:** `confidence` is the probability that every span is right. Accept
-  confident parses and send the rest for review; the 90% most confident test parses are 99.96%
+  confident parses and send the rest for review; the 90% most confident test parses are 99.97%
   exactly right.
 - **Recognizes non-addresses:** junk is labeled `NotAddress` instead of being forced into a parse.
+- **Tolerates typos:** a misspelt word keeps its label ("vermn" is still the state); 98.56% of
+  test addresses with a typo are parsed exactly right.
 
 ```js
 import { parse } from "nerdress";
@@ -31,7 +33,7 @@ const { spans, confidence } = parse(
 //   { start: 56, end: 58, label: "StateName",                 text: "OK" },
 //   { start: 59, end: 69, label: "ZipCode",                   text: "99507-1234" },
 // ]
-// confidence: 0.829
+// confidence: 0.851
 ```
 
 ## API

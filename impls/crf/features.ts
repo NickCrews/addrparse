@@ -64,7 +64,16 @@ const LEX_STATE_WORD = 64;
 const LEX_PRE_TYPE = 128;
 const LEX_PO_BOX = 256;
 const LEX_COUNTRY = 512;
-const LEX_BITS = 10;
+/** A misspelt state word ("vermn", "Alsaka"): see `fuzzyBits`. */
+export const LEX_FUZZY_STATE_WORD = 1024;
+/** A misspelt 4+ letter street suffix ("Stret", "Avneue"): see `fuzzyBits`. */
+export const LEX_FUZZY_SUFFIX = 2048;
+/** A misspelt street pre-type ("Higway") or unit type ("Apartmnet"): see `fuzzyBits`. */
+export const LEX_FUZZY_PRE_TYPE = 4096;
+export const LEX_FUZZY_OCCUPANCY = 8192;
+const LEX_FUZZY_ALL =
+  LEX_FUZZY_STATE_WORD | LEX_FUZZY_SUFFIX | LEX_FUZZY_PRE_TYPE | LEX_FUZZY_OCCUPANCY;
+const LEX_BITS = 14;
 
 const STATE_WORDS = [
   ...["alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut"],
@@ -111,6 +120,104 @@ const LEXICON: FeatureTable = (() => {
   add(COUNTRY_WORDS, LEX_COUNTRY);
   return m;
 })();
+
+// ---------------------------------------------------------------------------------------------
+// Fuzzy lexicons
+//
+// A token matches a lexicon word misspelt by a few edits when deleting at most one letter from
+// the token and at most two from the word gives the same string (symmetric-delete matching):
+// a deletion in the token undoes an inserted letter, one in the word undoes a dropped letter,
+// and one in each undoes a replaced or transposed letter. The first letter is never deleted,
+// since typos rarely hit it. Fuzzy matches get their own lexicon bits, so the model learns how
+// far to trust them: "Main" is one letter from "maine" but is rarely a state.
+
+/** Words shorter than this have no fuzzy matches: too many real words are 1 edit from them. */
+const FUZZY_MIN_LEN = 4;
+/** Longest token tried; longer tokens skip fuzzy matching. */
+const FUZZY_MAX_LEN = 16;
+/**
+ * Letters deleted from the token and the word together. Words of `FUZZY_LONG` letters or more
+ * allow one more: "vermn" is "vermont" with two letters dropped.
+ */
+const FUZZY_EDITS = 2;
+const FUZZY_LONG = 7;
+
+/** FNV hash of `s` lowercased, skipping the letters at indices `skip1` and `skip2`. */
+function hashWithout(s: string, skip1: number, skip2: number): number {
+  let h = FNV_OFFSET;
+  for (let k = 0; k < s.length; k++) if (k !== skip1 && k !== skip2) h = fnv(h, s.charCodeAt(k));
+  return h | 0 || 1;
+}
+
+/**
+ * Hashes of each word and its deletions, mapped to the most letters a token may still have
+ * deleted to match it: `edits(word) - deleted`, kept at its maximum over all words.
+ */
+function fuzzyTable(words: Iterable<string>): FeatureTable {
+  const m = new FeatureTable(1 << 14);
+  const put = (key: number, slack: number) => {
+    const s = m.slot(key, slack);
+    if (m.values[s]! < slack) m.values[s] = slack;
+  };
+  for (const w of words) {
+    if (w.length < FUZZY_MIN_LEN) continue;
+    const edits = FUZZY_EDITS + (w.length >= FUZZY_LONG ? 1 : 0);
+    put(hashWithout(w, -1, -1), edits);
+    for (let a = 1; a < w.length; a++) {
+      put(hashWithout(w, a, -1), edits - 1);
+      if (edits < 3) continue;
+      for (let b = a + 1; b < w.length; b++) put(hashWithout(w, a, b), edits - 2);
+    }
+  }
+  return m;
+}
+
+const FUZZY_STATE_WORDS = fuzzyTable(STATE_WORDS);
+const FUZZY_SUFFIXES = fuzzyTable(STREET_SUFFIXES);
+const FUZZY_PRE_TYPES = fuzzyTable(PRE_TYPE_WORDS);
+const FUZZY_OCCUPANCY = fuzzyTable(OCCUPANCY_TYPES);
+
+/** Bits of the fuzzy lexicons that have `key` with at least `minSlack` slack. */
+function fuzzyLookup(key: number, minSlack: number): number {
+  return (
+    (FUZZY_STATE_WORDS.get(key) >= minSlack ? LEX_FUZZY_STATE_WORD : 0) |
+    (FUZZY_SUFFIXES.get(key) >= minSlack ? LEX_FUZZY_SUFFIX : 0) |
+    (FUZZY_PRE_TYPES.get(key) >= minSlack ? LEX_FUZZY_PRE_TYPE : 0) |
+    (FUZZY_OCCUPANCY.get(key) >= minSlack ? LEX_FUZZY_OCCUPANCY : 0)
+  );
+}
+
+/** Lowercased letters of the token being matched, and the FNV state before each of them. */
+const fuzzyChars = new Int32Array(FUZZY_MAX_LEN);
+const fuzzyPrefix = new Int32Array(FUZZY_MAX_LEN);
+
+/**
+ * Fuzzy lexicon bits of the token `text[s, e)`: each lexicon that the token, or the token with
+ * one letter deleted, matches. Only all-letter tokens of FUZZY_MIN_LEN to FUZZY_MAX_LEN letters
+ * are tried.
+ */
+export function fuzzyBits(text: string, s: number, e: number): number {
+  const n = e - s;
+  if (n < FUZZY_MIN_LEN || n > FUZZY_MAX_LEN) return 0;
+  let h = FNV_OFFSET;
+  for (let k = 0; k < n; k++) {
+    const c = text.charCodeAt(s + k) | 32;
+    if (c < 97 || c > 122) return 0;
+    fuzzyChars[k] = c;
+    fuzzyPrefix[k] = h;
+    h = fnv(h, c);
+  }
+  // The whole token matches any entry; with a letter deleted, only entries with slack left.
+  let key = h | 0 || 1;
+  let bits = fuzzyLookup(key, 0);
+  for (let j = 1; j < n && bits !== LEX_FUZZY_ALL; j++) {
+    h = fuzzyPrefix[j]!;
+    for (let k = j + 1; k < n; k++) h = fnv(h, fuzzyChars[k]!);
+    key = h | 0 || 1;
+    bits |= fuzzyLookup(key, 1);
+  }
+  return bits;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Tokenization
@@ -319,7 +426,8 @@ export class Features {
       this.suffix2[i] = e - s >= 3 ? s2 | 0 : 0;
       this.suffix3[i] = e - s >= 4 ? s3 | 0 : 0;
       this.len[i] = Math.min(e - s, 12);
-      this.lex[i] = Math.max(0, LEXICON.get(nh | 0 || 1));
+      const lex = Math.max(0, LEXICON.get(nh | 0 || 1));
+      this.lex[i] = lex !== 0 ? lex : fuzzyBits(text, s, e);
       const sep = t.coreEnd[i] !== t.end[i];
       this.joinAfter[i] = sep
         ? JOIN_SEP
