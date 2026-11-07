@@ -12,6 +12,7 @@
     "compare": "node src/eval/compare.ts",
     "errors": "node src/eval/errors.ts",
     "noise": "node src/eval/noise.ts",
+    "docs": "node docs/build.ts",
     "test": "node --test 'test/**/*.test.ts'",
     "typecheck": "tsc",
     "fmt": "oxfmt",

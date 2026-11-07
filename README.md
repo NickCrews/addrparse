@@ -31,6 +31,7 @@ pnpm compare                       # latest run of every impl, side by side
 | `pnpm errors <run> [--label X] [--slice s]`       | misparsed examples as token / gold / predicted tables                   |
 | `pnpm noise <impl...> [--suite quick] [--last 5]` | run-to-run spread of each metric vs its noise threshold                 |
 | `pnpm data:override <id\|text>...`                | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels    |
+| `pnpm docs [--suite full]`                        | user docs as one offline HTML file, `docs/dist/index.html`              |
 
 `--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
 or red only when larger than the metric's noise threshold; smaller ones are dimmed.
@@ -183,6 +184,20 @@ errors, or trains a different model twice from the same data.
 
 `node src/data/fixture.ts` regenerates the fixture from the first examples of each split in
 `data/`; rerun it after changing how the data is built.
+
+## Docs
+
+`pnpm docs` builds `docs/dist/index.html`, one self-contained page for users of the parsers:
+usage, the label set, what is measured and why, the training data, a comparison of every impl,
+and a playground that runs `crf` and `lookup` in the browser with their models embedded. Numbers
+come from the latest run of each impl in the suite (`--suite`, default `full`) and from
+`data/stats.json`. Models come from the `models/` cache for that suite, trained first if missing.
+Demo rows are seeded samples of the dev split, picked by running the models at build time; the
+references' columns come from their saved predictions (`results/predictions/`).
+
+The page embeds trained models and dev examples, so it is gitignored; publishing it means
+distributing a Produced Work and an extract of a Derivative Database (see below). It carries the
+attribution from "Distributing a trained model", read from this README at build time.
 
 ## Data and licenses
 
