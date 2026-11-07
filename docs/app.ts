@@ -180,7 +180,7 @@ function rowParts(text: string): { span: number; first: string; rest: string } {
   let goldCells = "";
   if (gold) {
     goldCells =
-      `<th scope="row">gold</th><td class="pg-ner">${entsHtml(text, gold.gold)}</td><td></td>` +
+      `<th scope="row">gold</th><td></td><td class="pg-ner">${entsHtml(text, gold.gold)}</td>` +
       columns.map((l) => `<td>${esc(cellText(text, gold.gold, l))}</td>`).join("");
   }
   const ok = gold && impl ? gold.exact[impl] : undefined;
@@ -195,8 +195,8 @@ function rowParts(text: string): { span: number; first: string; rest: string } {
     pred += `<td colspan="${width - 1}" class="dim">${loadError ? esc(loadError) : "loading model…"}</td>`;
   } else {
     pred +=
-      `<td class="pg-ner">${entsHtml(text, res.spans)}</td>` +
-      `<td class="num">${res.confidence === undefined ? "–" : res.confidence.toFixed(3)}</td>`;
+      `<td class="num">${res.confidence === undefined ? "–" : res.confidence.toFixed(3)}</td>` +
+      `<td class="pg-ner">${entsHtml(text, res.spans)}</td>`;
     for (const l of columns) {
       const v = cellText(text, res.spans, l);
       const cls = !gold ? "" : v !== cellText(text, gold.gold, l) ? "cell-bad" : v ? "cell-ok" : "";
@@ -222,7 +222,7 @@ function headHtml(): string {
     (withGold
       ? `<th title="rows whose prediction equals gold">${exact}/${withGold} exact</th>`
       : "<th></th>") +
-    `<th>parsed</th><th class="num">conf.</th>` +
+    `<th class="num">conf.</th><th>parsed</th>` +
     columns.map((l) => `<th><mark class="lab" data-label="${l}">${l}</mark></th>`).join("") +
     `</tr></thead>`
   );
