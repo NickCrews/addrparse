@@ -14,6 +14,7 @@ import {
 } from "../src/data/noise.ts";
 import { DATA_DIR, datasetPath, ROOT } from "../src/data/paths.ts";
 import type { Label } from "../src/labels.ts";
+import { tokenize } from "../src/tokens.ts";
 import type { Example, Span } from "../src/types.ts";
 
 /** Builds an example from [text, label] fields joined by the given separators (default " "). */
@@ -98,6 +99,81 @@ describe("transforms", () => {
       ["Floor", "OccupancyType"],
       ["#1", "OccupancyIdentifier"],
     ]);
+  });
+
+  it("unit-joined sometimes joins a letter type with #, which belongs to the identifier", () => {
+    const ex = build([
+      ["9", "AddressNumber"],
+      ["Elm", "StreetName"],
+      ["Apt", "OccupancyType"],
+      ["4", "OccupancyIdentifier"],
+    ]);
+    const texts = new Set(
+      Array.from({ length: 40 }, (_, i) => noised(ex, "unit-joined", String(i)).text),
+    );
+    assert.deepEqual([...texts].sort(), ["9 Elm Apt#4", "9 Elm Apt4"]);
+    const hash = [...Array(40).keys()]
+      .map((i) => noised(ex, "unit-joined", String(i)))
+      .find((o) => o.text.includes("#"))!;
+    assert.deepEqual(fields(hash).slice(2), [
+      ["Apt", "OccupancyType"],
+      ["#4", "OccupancyIdentifier"],
+    ]);
+  });
+
+  it("box-joined joins a box or route type to its number", () => {
+    const box = build([
+      ["PO Box", "USPSBoxType"],
+      ["55", "USPSBoxID"],
+    ]);
+    assert.equal(noised(box, "box-joined").text, "PO Box55");
+    const route = build([
+      ["RR", "USPSBoxGroupType"],
+      ["2", "USPSBoxGroupID"],
+      ["Box", "USPSBoxType"],
+      ["5", "USPSBoxID"],
+    ]);
+    assert.equal(noised(route, "box-joined").text, "RR2 Box5");
+    const long = build([
+      ["Rural Route", "USPSBoxGroupType"],
+      ["2", "USPSBoxGroupID"],
+    ]);
+    assert.equal(applyNoise(long, "box-joined", seededRng("x")), undefined);
+  });
+
+  it("state-zip-joined joins a state code to the ZIP", () => {
+    assert.equal(noised(kenai, "state-zip-joined").text, "123 N Main St, Apt 4B, Kenai, AK99611");
+    const word = build([
+      ["Alaska", "StateName"],
+      ["99611", "ZipCode"],
+    ]);
+    assert.equal(applyNoise(word, "state-zip-joined", seededRng("x")), undefined);
+  });
+
+  it("dot-joined adds a period to an abbreviation and removes the space after it", () => {
+    for (const seed of ["a", "b", "c", "d"]) {
+      const out = noised(kenai, "dot-joined", seed).text;
+      assert.ok(
+        [
+          "123 N.Main St, Apt 4B, Kenai, AK 99611",
+          "123 N Main St, Apt.4B, Kenai, AK 99611",
+        ].includes(out),
+        out,
+      );
+    }
+  });
+
+  it("comma-joined removes the space after commas, except between digits", () => {
+    assert.equal(noised(kenai, "comma-joined").text, "123 N Main St,Apt 4B,Kenai,AK 99611");
+    const digits = build(
+      [
+        ["Apt", "OccupancyType"],
+        ["4", "OccupancyIdentifier"],
+        ["99611", "ZipCode"],
+      ],
+      [" ", ", "],
+    );
+    assert.equal(applyNoise(digits, "comma-joined", seededRng("x")), undefined);
   });
 
   it("unit-joined skips a letter type before a letter identifier", () => {
@@ -204,7 +280,9 @@ const WORDS: Partial<Record<Label, string[]>> = {
   StreetNamePostDirectional: ["NE", "W"],
   OccupancyType: ["Apt", "#", "Unit", "Apt #", "Suite", "Floor"],
   OccupancyIdentifier: ["4", "4B", "B", "201"],
-  USPSBoxType: ["PO Box"],
+  USPSBoxGroupType: ["RR", "PSC", "Rural Route"],
+  USPSBoxGroupID: ["2"],
+  USPSBoxType: ["PO Box", "Box", "Post Office Box"],
   USPSBoxID: ["77"],
   PlaceName: ["Kenai", "Mount Vernon", "St. Louis", "Anchorage"],
   StateName: ["AK", "Alaska", "N.J"],
@@ -222,7 +300,7 @@ const ORDER: Label[][] = [
   ["OccupancyType", "OccupancyIdentifier"],
   // A second unit-type field, e.g. "Basement Lot": same-label spans that must stay separate.
   ["OccupancyType"],
-  ["USPSBoxType", "USPSBoxID"],
+  ["USPSBoxGroupType", "USPSBoxGroupID", "USPSBoxType", "USPSBoxID"],
   ["PlaceName"],
   ["StateName"],
   ["ZipCode"],
@@ -261,6 +339,14 @@ function checkInvariants(ex: Example) {
   for (const s of [...spans, { start: text.length, end: text.length }]) {
     assert.match(text.slice(at, s.start), /^[\s,]*$/, `unlabeled text in ${JSON.stringify(text)}`);
     at = s.end;
+  }
+  // A token-level parser can produce every span.
+  const tokens = tokenize(text);
+  for (const s of spans) {
+    assert.ok(
+      tokens.some((t) => t.coreStart === s.start) && tokens.some((t) => t.coreEnd === s.end),
+      `span ${JSON.stringify(text.slice(s.start, s.end))} inside a token of ${JSON.stringify(text)}`,
+    );
   }
 }
 
@@ -325,7 +411,7 @@ describe("noise property", () => {
             break;
           case "unit-joined": {
             // Only occupancy spans change, and only by whitespace or by "#" moving from the
-            // type to the identifier.
+            // type to, or being added to, the identifier.
             const rest = (b: string[]) => b.filter((k) => !k.startsWith("Occupancy"));
             assert.deepEqual(rest(after), rest(before));
             const occupancy = (e: { text: string; spans: Span[] }) =>
@@ -333,9 +419,27 @@ describe("noise property", () => {
                 .filter(([, l]) => l!.startsWith("Occupancy"))
                 .map(([t]) => t)
                 .join("")
-                .replace(/\s/g, "");
+                .replace(/[\s#]/g, "");
             assert.equal(occupancy(out), occupancy(ex));
+            const squash = (t: string) => t.replace(/[\s#]/g, "");
+            assert.equal(squash(out.text), squash(ex.text));
+            break;
+          }
+          case "box-joined":
+          case "state-zip-joined":
+          case "comma-joined": {
+            // Same spans; only whitespace between them is removed.
+            assert.deepEqual(after, before);
+            assert.deepEqual(labels, labelsBefore);
             assert.equal(out.text.replace(/\s/g, ""), ex.text.replace(/\s/g, ""));
+            assert.ok(out.text.length < ex.text.length);
+            break;
+          }
+          case "dot-joined": {
+            // One span may gain a trailing period; one gap loses its whitespace.
+            assert.deepEqual(labels, labelsBefore);
+            assert.equal(out.text.replace(/[\s.]/g, ""), ex.text.replace(/[\s.]/g, ""));
+            assert.ok(out.text.split(/\s+/).length < ex.text.split(/\s+/).length);
             break;
           }
           case "drop-zip":

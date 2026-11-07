@@ -3,13 +3,13 @@
 US address parsing, ready for production:
 
 - **Run anywhere:** Pure javascript/typescript, no dependencies
-- **Accurate:** 98.25% of held-out test addresses parsed exactly right, 99.85% of words
+- **Accurate:** 99.30% of held-out test addresses parsed exactly right, 99.81% of words
   labeled right.
-- **Small and fast:** ~390 KB gzipped including the model, ~100k/sec, nothing to download or set up.
+- **Small and fast:** ~350 KB gzipped including the model, ~100k/sec, nothing to download or set up.
 - **Comprehensive:** Any US physical or mailing address: street addresses, PO boxes, rural and highway contract routes, general
   delivery, mileposts and military mail.
 - **Says how sure it is:** `confidence` is the probability that every span is right. Accept
-  confident parses and send the rest for review; the 90% most confident test parses are 98.86%
+  confident parses and send the rest for review; the 90% most confident test parses are 99.96%
   exactly right.
 - **Recognizes non-addresses:** junk is labeled `NotAddress` instead of being forced into a parse.
 
@@ -29,7 +29,7 @@ const { spans, confidence } = parse(
 //   { start: 56, end: 58, label: "StateName",                 text: "OK" },
 //   { start: 59, end: 69, label: "ZipCode",                   text: "99507-1234" },
 // ]
-// confidence: 0.923
+// confidence: 0.829
 ```
 
 ## API
@@ -111,7 +111,7 @@ I approached this with an "eval first" methodology. I defined two things:
   training cost, etc
 
 Then, once I set an agent loose to hillclimb on these evals.
-What it ended up with is a linear-chain CRF over whitespace tokens with hashed features.
+What it ended up with is a linear-chain CRF over word tokens with hashed features.
 For more info, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License and data attribution

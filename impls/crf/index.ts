@@ -1,5 +1,6 @@
 /**
- * Linear-chain model over whitespace tokens. features.ts extracts hashed features for both
+ * Linear-chain model over the tokens of src/tokens.ts: whitespace-delimited words, split where
+ * addresses often leave out a space ("Apt303", "St,Kenai"). features.ts extracts hashed features for both
  * training and inference; model.ts holds the states, the binary format and the Viterbi parser,
  * which reports its path's probability as the confidence; load.ts is the runtime entry point.
  * `TRAINER` picks the training method: a CRF fit by L1-regularized SGD (crf.ts), or an averaged

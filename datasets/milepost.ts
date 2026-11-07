@@ -90,8 +90,11 @@ export default {
           : [...road, rng() < 0.5 ? " " : ", ", ...marker];
     if (rng() < 0.08) {
       const unit = pickWeighted(rng, UNITS);
-      line.push(rng() < 0.6 ? ", " : " ", [unit, "OccupancyType"]);
-      line.push(unit === "#" ? "" : " ", [String(int(rng, 1, 40)), "OccupancyIdentifier"]);
+      const sep = rng() < 0.6 ? ", " : " ";
+      const id = String(int(rng, 1, 40));
+      // "#23" is all OccupancyIdentifier, as in usaddress and the unit-joined noise.
+      if (unit === "#") line.push(sep, [`#${id}`, "OccupancyIdentifier"]);
+      else line.push(sep, [unit, "OccupancyType"], " ", [id, "OccupancyIdentifier"]);
     }
     return withLocality(ctx, line, 0.75, alaska ? { state: ALASKA } : {});
   },

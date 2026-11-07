@@ -20,18 +20,26 @@ import type { Rng } from "./datasets.ts";
 export const NOISE_NAMES = [
   /** "Apt 4, 123 Main St": the unit moves before the house number. */
   "unit-first",
-  /** "Apt4", "#4": no space between unit type and identifier. */
+  /** "Apt4", "Apt#4", "#4": no space between unit type and identifier. */
   "unit-joined",
+  /** "PO Box55", "RR2 Box 5": no space between box or route type and its number. */
+  "box-joined",
   /** "Kenai, AK" from "Kenai, AK 99611". */
   "drop-zip",
   /** "Kenai 99611" from "Kenai, AK 99611". */
   "drop-state",
   /** "Kenai, 99611 AK". */
   "zip-before-state",
+  /** "Kenai, AK99611": no space between state code and ZIP. */
+  "state-zip-joined",
   /** "123 Main St\nKenai, AK": a line break before the city (or state/ZIP if no city). */
   "newline",
   /** "St." "N." "Apt.": a period after abbreviated directionals, street and unit types. */
   "extra-punct",
+  /** "N.Main", "St.Apt 4", "Ste.100": an abbreviation's period with no space after it. */
+  "dot-joined",
+  /** "123 Main St,Kenai,AK": no space after commas. */
+  "comma-joined",
   /** One deleted, transposed, doubled or keyboard-adjacent letter in a street, city or unit word. */
   "typo",
   /** The whole text lowercased. */
@@ -46,16 +54,21 @@ export type NoiseName = (typeof NOISE_NAMES)[number];
  * Probability each transform fires on an example it applies to. About three quarters of examples
  * stay clean, so clean-input accuracy remains the bulk of the headline numbers, while each noise
  * slice has roughly 100-200 examples in the quick suite's 5,000 dev examples. Transforms that apply
- * to few examples (units: 15%) get higher rates so their slices aren't too small to read.
+ * to few examples (units: 15%, PO boxes and routes) get higher rates so their slices aren't too
+ * small to read.
  */
 export const NOISE_RATES: Readonly<Record<NoiseName, number>> = {
   "unit-first": 0.15,
   "unit-joined": 0.25,
+  "box-joined": 0.15,
   "drop-zip": 0.04,
   "drop-state": 0.03,
   "zip-before-state": 0.03,
+  "state-zip-joined": 0.03,
   newline: 0.05,
   "extra-punct": 0.05,
+  "dot-joined": 0.03,
+  "comma-joined": 0.03,
   typo: 0.04,
   lowercase: 0.04,
   uppercase: 0.03,
@@ -129,9 +142,10 @@ const JOINABLE_UNIT_TYPE = /(?:^|\s)(?:#|apt|ap|unit|ste|no|rm)$/i;
  * A `#` joined to its identifier becomes part of the identifier, following usaddress: "#4" is
  * OccupancyIdentifier, and "Floor # 1" becomes OccupancyType "Floor" + OccupancyIdentifier "#1",
  * so span boundaries stay on whitespace. A joined letter type ("Apt4", "Unit139") keeps its
- * type and identifier as two spans inside one whitespace token.
+ * type and identifier as two spans inside one whitespace token; a quarter of the time a `#`
+ * joins them ("Apt#4"), and belongs to the identifier.
  */
-const unitJoined: Transform = (pieces) => {
+const unitJoined: Transform = (pieces, rng) => {
   let changed = false;
   for (let i = 1; i + 2 < pieces.length; i += 2) {
     const type = pieces[i]!;
@@ -146,7 +160,64 @@ const unitJoined: Transform = (pieces) => {
       pieces[i] = { ...type, text: hash[1]! };
       pieces[i + 1] = { text: hash[2]! };
       pieces[i + 2] = { ...id, text: `#${id.text}` };
-    } else pieces[i + 1] = { text: "" };
+    } else {
+      pieces[i + 1] = { text: "" };
+      if (rng() < 0.25) pieces[i + 2] = { ...id, text: `#${id.text}` };
+    }
+    changed = true;
+  }
+  return changed ? pieces : undefined;
+};
+
+/** Index pairs [type, id] of labeled pieces separated by whitespace only. */
+function pairsOf(pieces: Pieces, type: Label, id: Label): number[] {
+  const out: number[] = [];
+  for (let i = 1; i + 2 < pieces.length; i += 2) {
+    if (pieces[i]!.label !== type || pieces[i + 2]!.label !== id) continue;
+    if (/^\s+$/.test(pieces[i + 1]!.text)) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * Joins a box or route type to a numeric ID: "PO Box55", "Bx12", "RR2", "PSC3". Only when the
+ * type's last word is "Box" or an abbreviation (up to 4 letters), so "Rural Route2" and "Post
+ * Office Box" spellings are left alone.
+ */
+const boxJoined: Transform = (pieces) => {
+  const at = [
+    ...pairsOf(pieces, "USPSBoxType", "USPSBoxID"),
+    ...pairsOf(pieces, "USPSBoxGroupType", "USPSBoxGroupID"),
+  ].filter(
+    (i) =>
+      /(?:^|\s)(?:box|\p{L}{1,4})$/iu.test(pieces[i]!.text) && /^\p{N}/u.test(pieces[i + 2]!.text),
+  );
+  if (at.length === 0) return undefined;
+  for (const i of at) pieces[i + 1] = { text: "" };
+  return pieces;
+};
+
+/** "AK99611": a two-letter state code joined to the numeric ZIP after it. */
+const stateZipJoined: Transform = (pieces) => {
+  const at = pairsOf(pieces, "StateName", "ZipCode").filter(
+    (i) => /^\p{L}{2}$/u.test(pieces[i]!.text) && /^\p{N}/u.test(pieces[i + 2]!.text),
+  );
+  if (at.length === 0) return undefined;
+  for (const i of at) pieces[i + 1] = { text: "" };
+  return pieces;
+};
+
+/**
+ * "123 Main St,Kenai,AK 99611": the space after each comma between spans removed, except
+ * between digits ("Apt 4, 99611"), where "4,99611" would read as one number.
+ */
+const commaJoined: Transform = (pieces) => {
+  let changed = false;
+  for (let i = 2; i + 1 < pieces.length; i += 2) {
+    const gap = pieces[i]!.text;
+    if (!/^,\s+$/.test(gap)) continue;
+    if (/\p{N}$/u.test(pieces[i - 1]!.text) && /^\p{N}/u.test(pieces[i + 1]!.text)) continue;
+    pieces[i] = { text: "," };
     changed = true;
   }
   return changed ? pieces : undefined;
@@ -208,6 +279,27 @@ const extraPunct: Transform = (pieces, rng) => {
   return pieces;
 };
 
+/**
+ * An abbreviation (as extra-punct picks them) followed by a space and a word of 2+ letters or
+ * digits gets a period and loses the space: "N.Main", "St.Apt", "Ste.100". A word of one
+ * character is skipped: "St.E" would read as one abbreviation, and the tokenizer keeps it whole.
+ */
+const dotJoined: Transform = (pieces, rng) => {
+  const eligible = labeledIndices(pieces, (l) => ABBREVIATED.has(l)).filter(
+    (i) =>
+      isAbbreviation(pieces[i]!.text.replace(/\.$/, "")) &&
+      i + 2 < pieces.length &&
+      /^\s+$/.test(pieces[i + 1]!.text) &&
+      /^[\p{L}\p{N}]{2}/u.test(pieces[i + 2]!.text),
+  );
+  if (eligible.length === 0) return undefined;
+  const i = eligible[Math.floor(rng() * eligible.length)]!;
+  const text = pieces[i]!.text;
+  pieces[i] = { ...pieces[i]!, text: text.endsWith(".") ? text : `${text}.` };
+  pieces[i + 1] = { text: "" };
+  return pieces;
+};
+
 const TYPO_LABELS: ReadonlySet<Label> = new Set([
   "StreetName",
   "StreetNamePostType",
@@ -263,11 +355,15 @@ const recase =
 const TRANSFORMS: Record<NoiseName, Transform> = {
   "unit-first": unitFirst,
   "unit-joined": unitJoined,
+  "box-joined": boxJoined,
   "drop-zip": drop("ZipCode"),
   "drop-state": drop("StateName"),
   "zip-before-state": zipBeforeState,
+  "state-zip-joined": stateZipJoined,
   newline,
   "extra-punct": extraPunct,
+  "dot-joined": dotJoined,
+  "comma-joined": commaJoined,
   typo,
   lowercase: recase((s) => s.toLowerCase()),
   uppercase: recase((s) => s.toUpperCase()),

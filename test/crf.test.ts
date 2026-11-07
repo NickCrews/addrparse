@@ -69,6 +69,7 @@ describe("Tokens", () => {
       ", ; ,",
       "a b c\td\ne",
       ",lead trail,, ;both;",
+      "Apt303 Apt#4 St,Kenai,AK99501 N.Main St/Apt Unit-4 1,096 14.5 1/2",
     ];
     const t = new Tokens();
     for (const text of texts) {

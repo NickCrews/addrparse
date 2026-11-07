@@ -6,10 +6,9 @@
  *
  * - exactMatch: share of examples whose span set equals gold exactly. The headline number;
  *   it's what "parsed correctly" means to a caller.
- * - tokenAccuracy: share of whitespace tokens whose label (the span covering the token's first
- *   character, or none) matches gold. A token holding several gold spans, e.g. "Apt4" (unit type
- *   and identifier, see `unit-joined` in src/data/noise.ts), counts only its first span's label, so
- *   token accuracy can't see the second one; exact match and span F1 do.
+ * - tokenAccuracy: share of tokens (`tokenize` in src/tokens.ts, which splits "Apt4" into "Apt"
+ *   and "4") whose label (the span covering the token's first core character, or none) matches
+ *   gold.
  * - span precision/recall/F1: a predicted span counts only if start, end and label all match.
  * - abstention: on junk-only examples (every gold span is NotAddress), the share where the
  *   parser emits no other label; on all other examples, the share where it emits only

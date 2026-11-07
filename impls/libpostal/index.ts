@@ -34,7 +34,7 @@ const SIMPLE: Record<string, Label> = {
   near: "NotAddress",
 };
 
-/** Our labels for the whitespace tokens of one libpostal field, or undefined to leave it unlabeled. */
+/** Our labels for the tokens of one libpostal field, or undefined to leave it unlabeled. */
 function fieldLabels(field: string, tokens: string[]): Label[] | undefined {
   const notes: string[] = [];
   const simple = SIMPLE[field];

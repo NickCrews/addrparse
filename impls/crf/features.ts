@@ -12,6 +12,7 @@ import {
   OCCUPANCY_TYPES,
   STATE_CODES,
 } from "../../src/data/refine.ts";
+import { breakBefore } from "../../src/tokens.ts";
 import { FeatureTable } from "./table.ts";
 
 // ---------------------------------------------------------------------------------------------
@@ -134,8 +135,9 @@ function isSpace(c: number): boolean {
 const isEdgePunct = (c: number) => c === 44 || c === 59;
 
 /**
- * Whitespace tokens of a text, as typed arrays. Matches `tokenize` in src/tokens.ts: tokens are
- * `\S+` runs, the core excludes edge `,`/`;`, and tokens that are all edge punctuation are skipped.
+ * Tokens of a text, as typed arrays. Matches `tokenize` in src/tokens.ts: whitespace-delimited
+ * words split where `breakBefore` says, the core excludes edge `,`/`;`, and tokens that are all
+ * edge punctuation are skipped.
  */
 export class Tokens {
   n = 0;
@@ -145,27 +147,35 @@ export class Tokens {
   coreEnd = new Int32Array(64);
 
   tokenize(text: string): void {
-    let n = 0;
+    this.n = 0;
     const len = text.length;
     let i = 0;
     while (i < len) {
       while (i < len && isSpace(text.charCodeAt(i))) i++;
       if (i >= len) break;
-      const s = i;
-      while (i < len && !isSpace(text.charCodeAt(i))) i++;
-      let cs = s;
-      let ce = i;
-      while (cs < ce && isEdgePunct(text.charCodeAt(cs))) cs++;
-      while (ce > cs && isEdgePunct(text.charCodeAt(ce - 1))) ce--;
-      if (cs === ce) continue;
-      if (n === this.start.length) this.grow();
-      this.start[n] = s;
-      this.end[n] = i;
-      this.coreStart[n] = cs;
-      this.coreEnd[n] = ce;
-      n++;
+      let s = i;
+      for (i++; i < len && !isSpace(text.charCodeAt(i)); i++) {
+        if (breakBefore(text, i) && this.push(text, s, i)) s = i;
+      }
+      this.push(text, s, i);
     }
-    this.n = n;
+  }
+
+  /** Adds the token, or returns false if it is all separators (it then joins the next one). */
+  private push(text: string, s: number, e: number): boolean {
+    let cs = s;
+    let ce = e;
+    while (cs < ce && isEdgePunct(text.charCodeAt(cs))) cs++;
+    while (ce > cs && isEdgePunct(text.charCodeAt(ce - 1))) ce--;
+    if (cs === ce) return false;
+    const n = this.n;
+    if (n === this.start.length) this.grow();
+    this.start[n] = s;
+    this.end[n] = e;
+    this.coreStart[n] = cs;
+    this.coreEnd[n] = ce;
+    this.n = n + 1;
+    return true;
   }
 
   private grow(): void {
@@ -196,7 +206,7 @@ const T_SUFFIX3 = 8;
 const T_LEN = 9;
 const T_LEX = 10;
 const T_LEX_BIT = 11;
-/** Separators around the token and its distance from either end of the text. */
+/** What joins the token to its neighbours and its distance from either end of the text. */
 const T_EDGES = 12;
 /** Index of the comma-separated field from either end, and the token's place in it. */
 const T_FIELD = 13;
@@ -212,6 +222,15 @@ const T_NB_LEX = 32;
 const T_NB_BOUNDARY = 33;
 const NEIGHBOUR_STRIDE = 10;
 const NEIGHBOURS = [-2, -1, 1, 2];
+
+/** Whitespace only between a token and the next. */
+const JOIN_SPACE = 0;
+/** Separator punctuation (`,` `;`), with or without whitespace. */
+const JOIN_SEP = 1;
+/** Nothing: both are parts of one word, as "Apt" and "303" in "Apt303". */
+const JOIN_GLUED = 2;
+/** `joinBefore` of the first token. */
+const JOIN_START = 3;
 
 const CLS_DIGIT = 100;
 const CLS_UPPER = 101;
@@ -235,7 +254,8 @@ export class Features {
   private suffix3 = new Int32Array(64);
   private len = new Uint8Array(64);
   private lex = new Int32Array(64);
-  private sepAfter = new Uint8Array(64);
+  /** What joins token i to the next: JOIN_SPACE, JOIN_SEP or JOIN_GLUED. */
+  private joinAfter = new Uint8Array(64);
   private field = new Uint8Array(64);
   private fieldStart = new Int32Array(64);
   private fieldEnd = new Int32Array(64);
@@ -300,8 +320,12 @@ export class Features {
       this.suffix3[i] = e - s >= 4 ? s3 | 0 : 0;
       this.len[i] = Math.min(e - s, 12);
       this.lex[i] = Math.max(0, LEXICON.get(nh | 0 || 1));
-      const sep = t.coreEnd[i] !== t.end[i] ? 1 : 0;
-      this.sepAfter[i] = sep;
+      const sep = t.coreEnd[i] !== t.end[i];
+      this.joinAfter[i] = sep
+        ? JOIN_SEP
+        : i + 1 < n && t.start[i + 1] === t.end[i]
+          ? JOIN_GLUED
+          : JOIN_SPACE;
       this.field[i] = field;
       if (sep) field++;
     }
@@ -332,12 +356,12 @@ export class Features {
       f[p++] = mix(T_LEN, this.len[i]!);
       f[p++] = mix(T_LEX, lex);
       for (let b = 0; b < LEX_BITS; b++) if (lex & (1 << b)) f[p++] = mix(T_LEX_BIT, b);
-      const sepBefore = i > 0 ? this.sepAfter[i - 1]! : 2;
+      const joinBefore = i > 0 ? this.joinAfter[i - 1]! : JOIN_START;
       const fieldPos = this.field[i]!;
       f[p++] = mix(
         T_EDGES,
-        sepBefore |
-          (this.sepAfter[i]! << 2) |
+        joinBefore |
+          (this.joinAfter[i]! << 2) |
           (Math.min(i, 3) << 4) |
           (Math.min(n - 1 - i, 3) << 6),
       );
@@ -367,16 +391,16 @@ export class Features {
         }
         f[p++] = mix(T_NB_WORD + base, this.word[j]!);
         f[p++] = mix(T_NB_CSHAPE + base, this.cshape[j]!);
-        f[p++] = mix(T_NB_LEX + base, this.lex[j]! | (this.sepAfter[j]! << LEX_BITS));
+        f[p++] = mix(T_NB_LEX + base, this.lex[j]! | (this.joinAfter[j]! << LEX_BITS));
       }
     }
     this.offs[n] = p;
     return n;
   }
 
-  /** Lexicon bits, separator and collapsed shape of token i as one hash. */
+  /** Lexicon bits, join to the next token and collapsed shape of token i as one hash. */
   private cls(i: number): number {
-    return mix(this.lex[i]! | (this.sepAfter[i]! << LEX_BITS), this.cshape[i]!);
+    return mix(this.lex[i]! | (this.joinAfter[i]! << LEX_BITS), this.cshape[i]!);
   }
 
   private growTokens(n: number): void {
@@ -392,7 +416,7 @@ export class Features {
     this.suffix3 = new Int32Array(m);
     this.len = new Uint8Array(m);
     this.lex = new Int32Array(m);
-    this.sepAfter = new Uint8Array(m);
+    this.joinAfter = new Uint8Array(m);
     this.field = new Uint8Array(m);
     this.fieldStart = new Int32Array(m);
     this.fieldEnd = new Int32Array(m);

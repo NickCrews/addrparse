@@ -63,7 +63,8 @@ training.
 Training and inference run in separate processes and share only the model bytes, so
 serialization, size and load cost are part of what is measured.
 
-`src/tokens.ts` has a whitespace tokenizer and `spansFromTokens` for token-level models;
+`src/tokens.ts` has a tokenizer (whitespace-delimited words, split where addresses often leave
+out a space: "Apt303", "St,Kenai", "N.Main") and `spansFromTokens` for token-level models;
 `impls/lookup` uses them. `impls/noop` returns nothing: its timings and memory are the
 harness's own floor, so side-by-side tables dim its column and never rank it best.
 
@@ -100,7 +101,7 @@ and heap from one measurement don't affect another.
 | metric                    | how it's measured                                                                                                             |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | exact match               | share of eval examples whose predicted span set equals gold. The headline number.                                             |
-| token accuracy            | share of whitespace tokens whose label matches gold                                                                           |
+| token accuracy            | share of tokens (`src/tokens.ts`, which splits "Apt4" into "Apt" "4") whose label matches gold                                |
 | span P/R/F1               | a span counts only if start, end and label all match; also per label                                                          |
 | coarse exact match        | exact match with the street, the unit and the PO box each collapsed to one label, as libpostal has                            |
 | slices                    | exact match on subsets (`src/eval/slices.ts`), e.g. PO boxes, all-caps, junk-only, embedded, `noise=none`, one per noise type |
