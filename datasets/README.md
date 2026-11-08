@@ -96,8 +96,9 @@ Labeling conventions beyond `src/labels.ts`:
   house number) are NotAddress.
 - An intersection is two streets with the `AND` or `&` between them unlabeled:
   `3RD AND ALDER ST`.
-- A token that glues two fields can't be split, so it gets the label of its main part: `APT.9`
-  and `SP#142` are OccupancyIdentifier, `PO#39737` is USPSBoxID.
+- Words that glue two fields are split where the tokenizer splits them (`src/tokens.ts`), and
+  each part gets its own label: `APT.9` is OccupancyType `APT.` and OccupancyIdentifier `9`,
+  `HC60` is USPSBoxGroupType `HC` and USPSBoxGroupID `60`.
 
 ## Training on another blend
 

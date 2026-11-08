@@ -5,7 +5,8 @@
  * which reports its path's probability as the confidence; load.ts is the runtime entry point.
  * `TRAINER` picks the training method: a CRF fit by L1-regularized SGD (crf.ts), or an averaged
  * structured perceptron (perceptron.ts). Both produce the same model format; a perceptron's
- * scores aren't log-probabilities, so its confidences only rank parses.
+ * scores aren't log-probabilities, so its confidences only rank parses. Parse time depends most
+ * on the number of label transitions seen in training (viterbi.ts), not on the feature count.
  */
 import type { Impl } from "../../src/types.ts";
 import { trainCrf } from "./crf.ts";

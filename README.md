@@ -93,10 +93,10 @@ The data is a custom blend from several different sources:
 
 | dataset            | share | training examples | source                                        | example                                 |
 | ------------------ | ----: | ----------------: | --------------------------------------------- | --------------------------------------- |
-| `openaddresses`    | 43.4% |           217,019 | libpostal: OpenAddresses government data      | 123 Main St, Springfield, IL 62704      |
-| `osm`              | 33.0% |           164,934 | libpostal: OpenStreetMap addresses            | 45 Oak Ave Apt 2, Portland, OR 97214    |
-| `ways`             |  7.4% |            36,893 | libpostal: OpenStreetMap street and its place | Sled Ct, Palm Coast, Florida            |
-| `ak-voterfile`     |  4.3% |            21,478 | Alaska voter file, hand- and rule-labeled     | HOUSE #6, KASIGLUK, AK 99609            |
+| `openaddresses`    | 43.4% |           217,017 | libpostal: OpenAddresses government data      | 123 Main St, Springfield, IL 62704      |
+| `osm`              | 33.0% |           164,932 | libpostal: OpenStreetMap addresses            | 45 Oak Ave Apt 2, Portland, OR 97214    |
+| `ways`             |  7.4% |            36,892 | libpostal: OpenStreetMap street and its place | Sled Ct, Palm Coast, Florida            |
+| `ak-voterfile`     |  4.3% |            21,483 | Alaska voter file, hand- and rule-labeled     | HOUSE #6, KASIGLUK, AK 99609            |
 | `places`           |  3.9% |            19,531 | libpostal: OpenStreetMap place names          | Willistown, Chester County, PA          |
 | `embedded`         |  1.7% |             8,463 | synthetic: an address inside other text       | Mail to 12 Main St, thanks              |
 | `junk`             |  1.2% |             5,859 | synthetic: text with no address               | N/A; same as above; 555-0123            |
