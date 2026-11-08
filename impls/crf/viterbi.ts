@@ -10,7 +10,7 @@
  * The number of allowed transitions is what most directly sets parse time: Viterbi here and
  * forward-backward (the confidence) do work per token for every allowed transition. Adding
  * datasets/ak-voterfile.jsonl to the training blend took them from 175 to 308 of 676 and made
- * full-suite parsing ~30% slower (11.6 to ~15 µs p50, timed back to back), while cutting the
+ * full-suite parsing ~30% slower (11.3 to 14.8 µs p50, timed back to back), while cutting the
  * model's features by 35% or its weights by a third changed speed by under 5%.
  */
 export const transIndex = (L: number, from: number, to: number) => to * (L + 1) + from;

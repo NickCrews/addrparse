@@ -1,4 +1,4 @@
 {"id":"places:89","text":"IA","spans":[{"start":0,"end":2,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
-{"id":"places:114","text":"Upr Milll, PA","spans":[{"start":0,"end":9,"label":"PlaceName"},{"start":11,"end":13,"label":"StateName"}],"source":"places","notes":["dropped:state_district"],"noise":["typo"]}
+{"id":"places:114","text":"Upr Mikl, PA","spans":[{"start":0,"end":8,"label":"PlaceName"},{"start":10,"end":12,"label":"StateName"}],"source":"places","notes":["dropped:state_district"],"noise":["typo"]}
 {"id":"places:126","text":"MICHIGAN-SETTLEMENT, ME","spans":[{"start":0,"end":19,"label":"PlaceName"},{"start":21,"end":23,"label":"StateName"}],"source":"places","notes":["dropped:state_district"],"noise":["uppercase"]}
-{"id":"places:140","text":"Buck-Settlement, N Y, United States","spans":[{"start":0,"end":15,"label":"PlaceName"},{"start":17,"end":20,"label":"StateName"},{"start":22,"end":35,"label":"CountryName"}],"source":"places"}
+{"id":"places:140","text":"Buck-Settlement, N Y, United Statrs","spans":[{"start":0,"end":15,"label":"PlaceName"},{"start":17,"end":20,"label":"StateName"},{"start":22,"end":35,"label":"CountryName"}],"source":"places","noise":["typo"]}

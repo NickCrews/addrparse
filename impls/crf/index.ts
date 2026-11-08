@@ -22,8 +22,8 @@ const TRAINER = "crf" as "crf" | "perceptron";
 const MIN_COUNT = 10;
 
 /**
- * `l1` 0.4 instead of 0.2 keeps a third fewer weights (256 KB vs 380 KB gzipped) at the same
- * full-suite exact match (98.06% vs 98.07%); 0.8 halves the model again but costs 0.08pp.
+ * `l1` 0.4 instead of 0.2 keeps a third fewer weights at the same full-suite exact match
+ * (-0.01pp); 0.8 halves the model again but costs 0.08pp.
  */
 const CRF = { epochs: 10, eta0: 0.1, decay: 0.8, l1: 0.4, minWeight: 0.001 };
 /** Averaged perceptron weights count updates, so pruning works on a different scale. */

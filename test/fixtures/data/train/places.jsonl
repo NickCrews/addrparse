@@ -1,4 +1,4 @@
-{"id":"places:0","text":"Black-Gtae, S.C","spans":[{"start":0,"end":10,"label":"PlaceName"},{"start":12,"end":15,"label":"StateName"}],"source":"places","noise":["typo"]}
+{"id":"places:0","text":"Black-Gtse, S.C","spans":[{"start":0,"end":10,"label":"PlaceName"},{"start":12,"end":15,"label":"StateName"}],"source":"places","noise":["typo"]}
 {"id":"places:1","text":"CA","spans":[{"start":0,"end":2,"label":"StateName"}],"source":"places","notes":["dropped:island"]}
 {"id":"places:3","text":"AK","spans":[{"start":0,"end":2,"label":"StateName"}],"source":"places","notes":["dropped:island","dropped:state_district"]}
 {"id":"places:4","text":"Saint-Anton-Highlands, CO","spans":[{"start":0,"end":21,"label":"PlaceName"},{"start":23,"end":25,"label":"StateName"}],"source":"places","notes":["dropped:state_district"]}
