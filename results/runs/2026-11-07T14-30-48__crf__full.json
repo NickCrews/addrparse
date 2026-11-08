@@ -1,0 +1,137 @@
+{
+  "runId": "2026-11-07T14-30-48__crf__full",
+  "timestamp": "2026-11-07T23:30:48.028Z",
+  "impl": "crf",
+  "suite": "full",
+  "config": {
+    "split": "dev",
+    "trainExamples": 500000,
+    "evalExamples": 20000,
+    "seed": 1,
+    "latency": {
+      "warmupPasses": 3,
+      "calls": 300000
+    },
+    "throughput": {
+      "seconds": 3,
+      "repeats": 5,
+      "threads": [
+        1,
+        4
+      ]
+    },
+    "determinism": true,
+    "learningCurve": [
+      5000,
+      50000
+    ]
+  },
+  "git": {
+    "sha": "6507fd83ba3c63bd78a430f16d7200d0fd503f94",
+    "dirty": false
+  },
+  "implHash": "06119d6cebd95f1a",
+  "data": {
+    "trainHash": "2a051f3e7c8de8c6",
+    "evalHash": "5d1f12b36e5de528",
+    "trainWeights": {
+      "openaddresses": 1,
+      "osm": 0.76,
+      "ways": 0.17,
+      "places": 0.09,
+      "junk": 0.027,
+      "embedded": 0.039,
+      "ak-voterfile": 0.1,
+      "general-delivery": 0.012,
+      "highway-contract": 0.015,
+      "milepost": 0.02,
+      "military": 0.012,
+      "po-box": 0.04,
+      "rural-route": 0.02
+    }
+  },
+  "machine": {
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "memoryGB": 64,
+    "os": "darwin 25.6.0",
+    "node": "v26.12.1",
+    "load": 5.50244140625
+  },
+  "metrics": {
+    "training": {
+      "measured": {
+        "at": "2026-11-07T22:27:54.718Z",
+        "git": {
+          "sha": "2aa6d4be9ef863a4f6c6e7607e468afe26746e75",
+          "dirty": false
+        },
+        "machine": {
+          "cpu": "Apple M1 Max",
+          "cores": 10,
+          "memoryGB": 64,
+          "os": "darwin 25.6.0",
+          "node": "v26.12.1",
+          "load": 4.94921875
+        }
+      },
+      "seconds": 279.0982455410957,
+      "examplesPerSec": 1791.483851969889,
+      "tokensPerSec": 10728.010827137661,
+      "peakRssMB": 1170.359375,
+      "peakRssOverBaselineMB": 449.2195053100586,
+      "baselineRssMB": 730.9339904785156,
+      "peakHeapOverBaselineMB": 445.8297996520996,
+      "allocatedMB": 3261.0661296844482,
+      "modelBytes": 738257,
+      "info": {
+        "trainer": "crf",
+        "trainedFeatures": 798127,
+        "features": 55558,
+        "weights": 152581
+      },
+      "cached": true
+    },
+    "code": {
+      "bytes": 46014,
+      "lines": 1341,
+      "files": 10
+    },
+    "latency": {
+      "calls": 300000,
+      "meanUs": 17.112657796666838,
+      "p50Us": 16.333,
+      "p90Us": 26.083,
+      "p99Us": 44.25,
+      "p999Us": 109,
+      "maxUs": 2129.334,
+      "usPerToken": 2.8790285497176664
+    },
+    "throughput": {
+      "1": {
+        "threads": 1,
+        "callsPerSec": 62464.18139990678,
+        "tokensPerSec": 371280.8478229059,
+        "runs": [
+          62464.18139990678,
+          62387.75380382626,
+          59554.8641655445,
+          62519.95576569148,
+          64891.949660808656
+        ]
+      },
+      "4": {
+        "threads": 4,
+        "callsPerSec": 242146.60688096186,
+        "tokensPerSec": 1439295.2166397492,
+        "runs": [
+          238554.80112535815,
+          249157.0892926062,
+          240040.13618437506,
+          245438.70660250913,
+          242146.60688096186
+        ]
+      }
+    }
+  }
+}

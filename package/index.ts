@@ -13,6 +13,7 @@ declare const __NERDRESS_MODEL__: string;
 
 /** Names follow usaddress and the FGDC US address standard; `LABELS` describes each one. */
 export type Label =
+  | "Recipient"
   | "AddressNumberPrefix"
   | "AddressNumber"
   | "AddressNumberSuffix"
@@ -24,6 +25,7 @@ export type Label =
   | "StreetNamePostDirectional"
   | "OccupancyType"
   | "OccupancyIdentifier"
+  | "LandmarkName"
   | "USPSBoxGroupType"
   | "USPSBoxGroupID"
   | "USPSBoxType"

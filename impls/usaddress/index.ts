@@ -8,8 +8,8 @@
  * | ------------------------------------------- | ------------------------------------------ |
  * | SubaddressType, SubaddressIdentifier        | OccupancyType, OccupancyIdentifier         |
  * | "#" tagged an identifier (Occupancy, Subaddress, USPSBox) | the matching type, as our gold labels "#" |
- * | BuildingName, LandmarkName, CornerOf,       | no label                                   |
- * | IntersectionSeparator, Recipient            |                                            |
+ * | BuildingName, LandmarkName                  | LandmarkName                               |
+ * | CornerOf, IntersectionSeparator             | no label                                   |
  *
  * Tokens come back as strings ("Washington,"); spansFromPieces finds them in the text.
  */
@@ -20,11 +20,9 @@ import type { ReferenceImpl } from "../../src/types.ts";
 const MAP: Record<string, Label | undefined> = {
   SubaddressType: "OccupancyType",
   SubaddressIdentifier: "OccupancyIdentifier",
-  BuildingName: undefined,
-  LandmarkName: undefined,
+  BuildingName: "LandmarkName",
   CornerOf: undefined,
   IntersectionSeparator: undefined,
-  Recipient: undefined,
 };
 
 function mapLabel(label: string, token: string): Label | undefined {

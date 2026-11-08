@@ -108,6 +108,7 @@ export function normalizeSpans(text: string, spans: readonly Span[]): Span[] {
  * group is named by one of its labels.
  */
 export const COARSE: Record<Label, Label> = {
+  Recipient: "Recipient",
   AddressNumberPrefix: "AddressNumber",
   AddressNumber: "AddressNumber",
   AddressNumberSuffix: "AddressNumber",
@@ -119,6 +120,7 @@ export const COARSE: Record<Label, Label> = {
   StreetNamePostDirectional: "StreetName",
   OccupancyType: "OccupancyIdentifier",
   OccupancyIdentifier: "OccupancyIdentifier",
+  LandmarkName: "LandmarkName",
   USPSBoxGroupType: "USPSBoxID",
   USPSBoxGroupID: "USPSBoxID",
   USPSBoxType: "USPSBoxID",

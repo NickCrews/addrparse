@@ -5,7 +5,8 @@
  * which reports its path's probability as the confidence; load.ts is the runtime entry point.
  * `TRAINER` picks the training method: a CRF fit by L1-regularized SGD (crf.ts), or an averaged
  * structured perceptron (perceptron.ts). Both produce the same model format; a perceptron's
- * scores aren't log-probabilities, so its confidences only rank parses.
+ * scores aren't log-probabilities, so its confidences only rank parses. Parse time depends most
+ * on the number of label transitions seen in training (viterbi.ts), not on the feature count.
  */
 import type { Impl } from "../../src/types.ts";
 import { trainCrf } from "./crf.ts";
@@ -14,9 +15,17 @@ import { decode, encode } from "./model.ts";
 import { trainPerceptron } from "./perceptron.ts";
 
 const TRAINER = "crf" as "crf" | "perceptron";
-const MIN_COUNT = 2;
+/**
+ * Features seen fewer times than this in training are left out. On the full suite, 10 instead of
+ * 2 gives the same exact match with a 27% smaller model; the dropped features are rare words.
+ */
+const MIN_COUNT = 10;
 
-const CRF = { epochs: 10, eta0: 0.1, decay: 0.8, l1: 0.2, minWeight: 0.001 };
+/**
+ * `l1` 0.4 instead of 0.2 keeps a third fewer weights at the same full-suite exact match
+ * (-0.01pp); 0.8 halves the model again but costs 0.08pp.
+ */
+const CRF = { epochs: 10, eta0: 0.1, decay: 0.8, l1: 0.4, minWeight: 0.001 };
 /** Averaged perceptron weights count updates, so pruning works on a different scale. */
 const PERCEPTRON = { epochs: 8, minWeight: 1 };
 

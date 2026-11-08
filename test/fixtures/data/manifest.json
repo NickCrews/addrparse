@@ -1,22 +1,22 @@
 {
   "datasets": {
     "openaddresses": {
-      "train": 184,
-      "dev": 48,
-      "test": 48
+      "train": 176,
+      "dev": 47,
+      "test": 47
     },
     "osm": {
-      "train": 139,
-      "dev": 37,
-      "test": 37
+      "train": 134,
+      "dev": 35,
+      "test": 35
     },
     "ways": {
-      "train": 31,
-      "dev": 8,
-      "test": 8
+      "train": 29,
+      "dev": 7,
+      "test": 7
     },
     "places": {
-      "train": 16,
+      "train": 15,
       "dev": 4,
       "test": 4
     },
@@ -26,9 +26,14 @@
       "test": 1
     },
     "embedded": {
-      "train": 7,
+      "train": 6,
       "dev": 1,
       "test": 1
+    },
+    "ak-voterfile": {
+      "train": 17,
+      "dev": 4,
+      "test": 4
     },
     "general-delivery": {
       "train": 2,

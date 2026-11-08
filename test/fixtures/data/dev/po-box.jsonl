@@ -1,1 +1,1 @@
-{"id":"po-box:93","text":"Box 495","spans":[{"start":0,"end":3,"label":"USPSBoxType"},{"start":4,"end":7,"label":"USPSBoxID"}],"source":"po-box"}
+{"id":"po-box:57","text":"Box 9, Fallbrook, California","spans":[{"start":0,"end":3,"label":"USPSBoxType"},{"start":4,"end":5,"label":"USPSBoxID"},{"start":7,"end":16,"label":"PlaceName"},{"start":18,"end":28,"label":"StateName"}],"source":"po-box"}

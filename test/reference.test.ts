@@ -100,6 +100,7 @@ describe("usaddress toSpans", () => {
       ["St", "StreetNamePostType"],
     ]);
     assert.deepEqual(show(text, spans), [
+      ["Attn Bob", "Recipient"],
       ["12", "AddressNumber"],
       ["A", "AddressNumberSuffix"],
       ["Bldg", "OccupancyType"],

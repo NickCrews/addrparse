@@ -1,2 +1,2 @@
-{"id":"general-delivery:0","text":"Gen Delivery\nCharleston, TN 37310","spans":[{"start":0,"end":12,"label":"USPSBoxType"},{"start":13,"end":23,"label":"PlaceName"},{"start":25,"end":27,"label":"StateName"},{"start":28,"end":33,"label":"ZipCode"}],"source":"general-delivery","noise":["newline"]}
+{"id":"general-delivery:0","text":"Gen Delivery Atlanta, GA","spans":[{"start":0,"end":12,"label":"USPSBoxType"},{"start":13,"end":20,"label":"PlaceName"},{"start":22,"end":24,"label":"StateName"}],"source":"general-delivery"}
 {"id":"general-delivery:1","text":"General Delivery Womens Bay, AK","spans":[{"start":0,"end":16,"label":"USPSBoxType"},{"start":17,"end":27,"label":"PlaceName"},{"start":29,"end":31,"label":"StateName"}],"source":"general-delivery"}

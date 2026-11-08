@@ -11,7 +11,8 @@
  * (src/data/refine.ts): `road` → StreetNamePre/PostDirectional, StreetNamePre/PostType,
  * StreetName; `unit`, `level` → OccupancyType/Identifier; `po_box` → USPSBoxGroupType/ID,
  * USPSBoxType/ID. The fine labels therefore score libpostal plus those rules; the coarse metrics
- * score libpostal alone. Fields our gold removes from the text (suburb, house, ...) get no label.
+ * score libpostal alone. `house` (a venue or building name) → LandmarkName. Other fields our gold
+ * removes from the text (suburb, ...) get no label.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -30,6 +31,7 @@ const SIMPLE: Record<string, Label> = {
   state: "StateName",
   postcode: "ZipCode",
   country: "CountryName",
+  house: "LandmarkName",
   category: "NotAddress",
   near: "NotAddress",
 };

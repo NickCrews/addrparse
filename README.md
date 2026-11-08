@@ -56,6 +56,7 @@ Thoroughfare, Landmark, and Postal Address Data Standard:
 
 | label                       | example                                 |
 | --------------------------- | --------------------------------------- |
+| `Recipient`                 | **C/O Jane Doe**, PO Box 55             |
 | `AddressNumberPrefix`       | **Mile** 14.5 Parks Hwy                 |
 | `AddressNumber`             | **123**, **45-29**                      |
 | `AddressNumberSuffix`       | 12 **B**                                |
@@ -67,6 +68,7 @@ Thoroughfare, Landmark, and Postal Address Data Standard:
 | `StreetNamePostDirectional` | Main St **NE**                          |
 | `OccupancyType`             | **Apt** 4B, **Suite** 100, **#** 3      |
 | `OccupancyIdentifier`       | Apt **4B**                              |
+| `LandmarkName`              | **Teacher Housing** Apt C4              |
 | `USPSBoxGroupType`          | **RR** 2 Box 5, **PSC** 3 Box 12        |
 | `USPSBoxGroupID`            | RR **2** Box 5                          |
 | `USPSBoxType`               | **PO Box** 55, **General Delivery**     |
@@ -80,26 +82,30 @@ Thoroughfare, Landmark, and Postal Address Data Standard:
 ## Scope
 
 All physical and mailing addresses in the US: street addresses, PO boxes, rural and highway contract routes, general
-delivery, mileposts and military mail. It does not validate addresses (whether one exists or
+delivery, mileposts, military mail, and the forms rural Alaska uses: lot and block numbers, house
+numbers on streets with no address numbers, named housing and subdivisions, and directions
+("blue house across from the post office"). It does not validate addresses (whether one exists or
 gets mail), geocode them, or standardize them (rewrite Street as ST, fill in a missing ZIP);
-spans point into the input unchanged. Names of people and businesses are `NotAddress`.
+spans point into the input unchanged. A name written with an address (before it, or after C/O
+or Attn) is `Recipient`; a name alone is `NotAddress`.
 
 The data is a custom blend from several different sources:
 
 | dataset            | share | training examples | source                                        | example                                 |
 | ------------------ | ----: | ----------------: | --------------------------------------------- | --------------------------------------- |
-| `openaddresses`    | 45.4% |           226,759 | libpostal: OpenAddresses government data      | 123 Main St, Springfield, IL 62704      |
-| `osm`              | 34.5% |           172,336 | libpostal: OpenStreetMap addresses            | 45 Oak Ave Apt 2, Portland, OR 97214    |
-| `ways`             |  7.7% |            38,549 | libpostal: OpenStreetMap street and its place | Sled Ct, Palm Coast, Florida            |
-| `places`           |  4.1% |            20,408 | libpostal: OpenStreetMap place names          | Willistown, Chester County, PA          |
-| `embedded`         |  1.8% |             8,843 | synthetic: an address inside other text       | Mail to 12 Main St, thanks              |
-| `junk`             |  1.2% |             6,122 | synthetic: text with no address               | N/A; same as above; 555-0123            |
-| `po-box`           |  1.8% |             9,070 | synthetic                                     | PO Box 123, P.O. Box, POB, Drawer       |
-| `rural-route`      |  0.9% |             4,535 | synthetic                                     | RR 2 Box 123, Rural Route 2, RFD 3      |
-| `milepost`         |  0.9% |             4,535 | synthetic                                     | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy |
-| `highway-contract` |  0.7% |             3,401 | synthetic                                     | HC 60 Box 4321, HCR 1 Box 45            |
-| `general-delivery` |  0.5% |             2,721 | synthetic                                     | General Delivery, Kenai, AK 99611       |
-| `military`         |  0.5% |             2,721 | synthetic                                     | PSC 1234, Box 5678, APO AE 09204        |
+| `openaddresses`    | 43.4% |           217,017 | libpostal: OpenAddresses government data      | 123 Main St, Springfield, IL 62704      |
+| `osm`              | 33.0% |           164,932 | libpostal: OpenStreetMap addresses            | 45 Oak Ave Apt 2, Portland, OR 97214    |
+| `ways`             |  7.4% |            36,892 | libpostal: OpenStreetMap street and its place | Sled Ct, Palm Coast, Florida            |
+| `ak-voterfile`     |  4.3% |            21,483 | Alaska voter file, hand- and rule-labeled     | HOUSE #6, KASIGLUK, AK 99609            |
+| `places`           |  3.9% |            19,531 | libpostal: OpenStreetMap place names          | Willistown, Chester County, PA          |
+| `embedded`         |  1.7% |             8,463 | synthetic: an address inside other text       | Mail to 12 Main St, thanks              |
+| `junk`             |  1.2% |             5,859 | synthetic: text with no address               | N/A; same as above; 555-0123            |
+| `po-box`           |  1.7% |             8,680 | synthetic                                     | PO Box 123, P.O. Box, POB, Drawer       |
+| `rural-route`      |  0.9% |             4,340 | synthetic                                     | RR 2 Box 123, Rural Route 2, RFD 3      |
+| `milepost`         |  0.9% |             4,340 | synthetic                                     | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy |
+| `highway-contract` |  0.7% |             3,255 | synthetic                                     | HC 60 Box 4321, HCR 1 Box 45            |
+| `general-delivery` |  0.5% |             2,604 | synthetic                                     | General Delivery, Kenai, AK 99611       |
+| `military`         |  0.5% |             2,604 | synthetic                                     | PSC 1234, Box 5678, APO AE 09204        |
 | **total**          |  100% |       **500,000** |                                               |                                         |
 
 Share is each dataset's weight in the training and eval sets. The shipped model is trained on the first 500,000 examples of the blend.
