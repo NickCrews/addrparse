@@ -1,12 +1,12 @@
 {
   "datasets": {
     "openaddresses": {
-      "train": 176,
-      "dev": 47,
-      "test": 47
+      "train": 175,
+      "dev": 46,
+      "test": 46
     },
     "osm": {
-      "train": 134,
+      "train": 132,
       "dev": 35,
       "test": 35
     },
@@ -27,6 +27,11 @@
     },
     "embedded": {
       "train": 6,
+      "dev": 1,
+      "test": 1
+    },
+    "ak-apoc": {
+      "train": 4,
       "dev": 1,
       "test": 1
     },
@@ -56,7 +61,7 @@
       "test": 0
     },
     "po-box": {
-      "train": 7,
+      "train": 6,
       "dev": 1,
       "test": 1
     },

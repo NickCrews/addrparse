@@ -5,7 +5,8 @@ import type { Blend } from "./src/data/blend.ts";
  * of a blended split has the datasets in these proportions until one runs out. A dataset not
  * listed here gets weight 1. The libpostal and not-address weights are in proportion to how many
  * examples each has, so they all run out together; the synthetic address forms are each about
- * 0.5–2% of the blend and the hand-labeled Alaska voter-file addresses about 4%.
+ * 0.5–2% of the blend, the Alaska voter-file addresses about 4% and the Alaska campaign finance
+ * addresses about 1%.
  */
 export const DATASET_WEIGHTS: Record<string, number> = {
   openaddresses: 1,
@@ -22,6 +23,8 @@ export const DATASET_WEIGHTS: Record<string, number> = {
   military: 0.012,
   // Enough that the first 500,000 training examples (the full suite) use all of its train split.
   "ak-voterfile": 0.1,
+  // Likewise: the full suite uses all of its train split.
+  "ak-apoc": 0.025,
 };
 
 /**

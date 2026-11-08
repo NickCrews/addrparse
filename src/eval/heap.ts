@@ -3,7 +3,8 @@
  * sampled RSS, so they are stable even for windows of a few milliseconds. "Heap" here includes
  * external memory (ArrayBuffers and typed arrays), where models often keep their weights.
  *
- * Heap bytes allocated come from V8's `total_allocated_bytes` counter, which only grows.
+ * Heap bytes allocated come from V8's `total_allocated_bytes` counter, which only grows. Node
+ * before 26 doesn't have it, and there `allocated` is undefined.
  * External memory has no such counter, so its allocation is the growth between consecutive
  * collections, summed, from the statistics `v8.GCProfiler` reports before and after each one.
  *
@@ -20,7 +21,7 @@ export interface HeapWindow {
   /** Highest heap + external bytes in the window, minus the bytes at its start. */
   peakOverBaseline: number;
   /** Heap + external bytes allocated during the window, including what was collected. */
-  allocated: number;
+  allocated?: number;
 }
 
 interface Stats {
@@ -47,7 +48,10 @@ export function startHeapWindow(): () => HeapWindow {
       lastExternal = gc.afterGC.heapStatistics.externalMemory;
     }
     external += Math.max(0, end.external_memory - lastExternal);
-    const heap = end.total_allocated_bytes - start.total_allocated_bytes;
-    return { peakOverBaseline: peak - startUsed, allocated: heap + external };
+    const total = (s: v8.HeapInfo) =>
+      (s as { total_allocated_bytes?: number }).total_allocated_bytes;
+    const [a, b] = [total(start), total(end)];
+    const allocated = a === undefined || b === undefined ? undefined : b - a + external;
+    return { peakOverBaseline: peak - startUsed, allocated };
   };
 }

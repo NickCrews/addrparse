@@ -269,7 +269,9 @@ the US, relabeled into the label set above, deduplicated and split by a hash of 
 datasets add address forms libpostal's data barely has: PO boxes as people write them, rural and highway
 contract routes, general delivery, mileposts and military mail. ${code("ak-voterfile")} is real addresses from
 Alaska's voter file with the rural forms none of the others have (lot and block, house numbers on unnumbered
-village streets, named housing, directions, C/O lines). Each dataset is stored on its own, and a
+village streets, named housing, directions, C/O lines). ${code("ak-apoc")} is real addresses from Alaska
+campaign finance reports, picked where the parser trained without it went wrong: what people type into a
+web form's address, city, state and ZIP boxes, including business names, notes and placeholders. Each dataset is stored on its own, and a
 split is interleaved from them by weight when it is loaded, so every prefix of a split has the same mix.</p>
 ${table(
   ["source", "weight", "lines read", "rejected", "duplicates", "examples", "share"],
