@@ -1,7 +1,7 @@
 # Contributing
 
 This repository is an eval harness for US address parsers written in pure TypeScript, and the
-source of the `addrparse` npm package (`README.md` is the package's page). An implementation in
+source of the `nerdress` npm package (`README.md` is the package's page). An implementation in
 `impls/<name>/` trains on labeled addresses and parses text into labeled spans (`AddressNumber`,
 `StreetName`, `PlaceName`, …; see `src/labels.ts`). The harness measures accuracy, speed, memory,
 model size and training cost, saves every run, and compares runs, so implementations can be
@@ -211,10 +211,10 @@ their id and are only compared with other test runs.
 
 `.github/workflows/ci.yml` runs `pnpm check` and then the `ci` suite for every trained impl (not the reference impls) on
 `test/fixtures/data/`, a few hundred committed examples. `eval`, `errors` and `data:build` read and write the
-splits in `$ADDRPARSE_DATA_DIR` instead of `data/` when that is set (downloads stay in `data/raw/`):
+splits in `$NERDRESS_DATA_DIR` instead of `data/` when that is set (downloads stay in `data/raw/`):
 
 ```sh
-ADDRPARSE_DATA_DIR=test/fixtures/data pnpm eval lookup --suite ci
+NERDRESS_DATA_DIR=test/fixtures/data pnpm eval lookup --suite ci
 ```
 
 Runs of the `ci` suite are gitignored. `pnpm eval` exits non-zero when an impl throws, has parse
@@ -239,7 +239,7 @@ attribution from "Distributing a trained model", read from this file at build ti
 
 ## npm package
 
-`package/` builds the `addrparse` npm package: `impls/crf` with a model trained on the `full`
+`package/` builds the `nerdress` npm package: `impls/crf` with a model trained on the `full`
 suite's training set, embedded as base64, exporting `parse(text)` and `LABELS`
 (`package/index.ts`), with no dependencies and no `node:` imports. `package/package.json` is its
 manifest and holds the version; `README.md` is its npm page.
@@ -339,7 +339,7 @@ data rebuilt from current OpenAddresses needs this check redone.
    > https://github.com/openaddresses/openaddresses/tree/06015e09e15bbcfdaac7d10883665db66c4d1f1c/sources/us,
    > including Oregon Metro (ODbL 1.0), via libpostal's training data
    > (https://github.com/openvenues/libpostal). The data was relabeled and reformatted by
-   > https://github.com/NickCrews/addrparse/tree/main/src/data.
+   > https://github.com/NickCrews/nerdress/tree/main/src/data.
 
    Sources with an `attribution name` at that commit want that name credited; the link above
    is how this attribution points to them (CC BY 4.0 §3(a)(2) allows a URI for this).

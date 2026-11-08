@@ -75,7 +75,7 @@ Hill-climb on the dev split only. Never look at or evaluate on the test split.
 ## Targets
 
 - Exact match as high as the gold allows; some gold labels are unrecoverable (see the open
-  gold-label issues: `gh issue list -R NickCrews/addrparse`).
+  gold-label issues: `gh issue list -R NickCrews/nerdress`).
 - Low risk–coverage AURC and high coverage @ 99% exact; junk abstained near 100% with
   addresses abstained near 0%.
 - p50 latency in single-digit µs.

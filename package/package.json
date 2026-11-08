@@ -1,5 +1,5 @@
 {
-  "name": "addrparse",
+  "name": "nerdress",
   "version": "0.1.0",
   "description": "US address parser: a trained linear-chain CRF in plain JavaScript, no dependencies, for Node and browsers",
   "keywords": [
@@ -11,13 +11,13 @@
     "us",
     "usaddress"
   ],
-  "homepage": "https://github.com/NickCrews/addrparse#readme",
-  "bugs": "https://github.com/NickCrews/addrparse/issues",
+  "homepage": "https://github.com/NickCrews/nerdress#readme",
+  "bugs": "https://github.com/NickCrews/nerdress/issues",
   "license": "MIT",
   "author": "Nick Crews",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NickCrews/addrparse.git"
+    "url": "git+https://github.com/NickCrews/nerdress.git"
   },
   "files": [
     "index.js",

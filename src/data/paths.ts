@@ -1,9 +1,9 @@
 import { join, resolve } from "node:path";
 
 export const ROOT = join(import.meta.dirname, "..", "..");
-/** data/, or the directory in `ADDRPARSE_DATA_DIR` (CI points it at test/fixtures/data). */
-export const DATA_DIR = process.env.ADDRPARSE_DATA_DIR
-  ? resolve(process.env.ADDRPARSE_DATA_DIR)
+/** data/, or the directory in `NERDRESS_DATA_DIR` (CI points it at test/fixtures/data). */
+export const DATA_DIR = process.env.NERDRESS_DATA_DIR
+  ? resolve(process.env.NERDRESS_DATA_DIR)
   : join(ROOT, "data");
 /** Downloaded sources; always data/raw, since only the splits are swapped out for fixtures. */
 export const RAW_DIR = join(ROOT, "data", "raw");

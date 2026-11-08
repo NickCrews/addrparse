@@ -375,7 +375,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
     for (const n of sizes) {
       const t0 = now();
       const { model } = n === config.trainExamples ? main : await ensureModel(impl, implHash, n);
-      const out = join(os.tmpdir(), `addrparse-curve-${process.pid}.jsonl`);
+      const out = join(os.tmpdir(), `nerdress-curve-${process.pid}.jsonl`);
       const p = await predict(impl, model, out, evalExamples);
       rmSync(out);
       const a = scoreAll(evalExamples, p.spans);

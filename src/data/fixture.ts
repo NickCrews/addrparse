@@ -1,5 +1,5 @@
 /**
- * Writes test/fixtures/data/: from data/ (or `$ADDRPARSE_DATA_DIR`), the examples of each dataset
+ * Writes test/fixtures/data/: from data/ (or `$NERDRESS_DATA_DIR`), the examples of each dataset
  * that the default blend's first examples of each split take, as many as the `ci` suite uses,
  * and a manifest. Loading the default blend from the fixture gives exactly those examples in the
  * same order. The fixture is committed so CI can run every impl without downloading the training

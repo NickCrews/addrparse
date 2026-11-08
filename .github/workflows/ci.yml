@@ -26,5 +26,5 @@ jobs:
       # Reference impls (impls/*/predict.py) need Python and libpostal, so CI skips them.
       - name: ci suite for every trained impl on the fixture data
         env:
-          ADDRPARSE_DATA_DIR: test/fixtures/data
+          NERDRESS_DATA_DIR: test/fixtures/data
         run: pnpm eval $(for d in impls/*/; do [ -e "$d/predict.py" ] || basename "$d"; done) --suite ci
