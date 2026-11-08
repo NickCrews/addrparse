@@ -7,10 +7,12 @@
  *   README.md     the repo's README.md plus a section on this release's model
  *   LICENSE       the repo's LICENSE plus the model attribution from CONTRIBUTING.md
  *
- *   pnpm package [--suite full] [--out dir]
+ *   pnpm package [--suite full] [--out dir] [--model models/crf/<key>.bin]
  *
  * The model is the suite's crf model from the models/ cache that `pnpm eval` and `pnpm docs`
  * share, trained on the default blend first if missing (a few minutes and ~1 GB for `full`).
+ * `--model` embeds that file instead; the README still describes it as the suite's model, so pass
+ * one that `pnpm eval crf --suite <suite>` trained at this commit.
  * Training reads `$NERDRESS_DATA_DIR` like the harness does. Publish with `npm publish dist`.
  */
 import { createHash } from "node:crypto";
@@ -34,6 +36,7 @@ const { values: opts } = parseArgs({
   options: {
     suite: { type: "string", default: "full" },
     out: { type: "string", default: join(ROOT, "dist") },
+    model: { type: "string" },
   },
 });
 if (!Object.hasOwn(SUITES, opts.suite!)) throw new Error(`unknown suite ${opts.suite}`);
@@ -55,14 +58,18 @@ function wrap(text: string, width = 80): string {
   return [...lines, line].join("\n");
 }
 
-const { model: modelPath } = await ensureModel({
-  impl: "crf",
-  implHash: implSourceHash("crf"),
-  n: config.trainExamples,
-  seed: config.seed,
-  weights: defaultWeights(),
-  log,
-});
+const modelPath = opts.model
+  ? resolve(opts.model)
+  : (
+      await ensureModel({
+        impl: "crf",
+        implHash: implSourceHash("crf"),
+        n: config.trainExamples,
+        seed: config.seed,
+        weights: defaultWeights(),
+        log,
+      })
+    ).model;
 const model = readFileSync(modelPath);
 load(model); // throws on a model this code can't read
 const modelSha = createHash("sha256").update(model).digest("hex");
