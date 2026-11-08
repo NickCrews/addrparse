@@ -3,7 +3,7 @@
  *
  *   index.js      package/index.ts bundled by esbuild, with the crf model embedded as base64
  *   index.d.ts    package/index.ts's declarations
- *   package.json  package/package.json
+ *   package.json  package/package.json with the version from the root package.json
  *   README.md     the repo's README.md plus a section on this release's model
  *   LICENSE       the repo's LICENSE plus the model attribution from LICENSING.md
  *
@@ -106,7 +106,12 @@ if (/^\s*import\b/m.test(dts.outputText)) {
 }
 writeFileSync(join(out, "index.d.ts"), dts.outputText);
 
-const pkg = JSON.parse(readFileSync(join(PKG, "package.json"), "utf8")) as { version: string };
+// The version lives in the root package.json so there is one place to bump it.
+const { version } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+  version: string;
+};
+const { name, ...manifest } = JSON.parse(readFileSync(join(PKG, "package.json"), "utf8"));
+const pkg = { name, version, ...manifest };
 writeFileSync(join(out, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
 const release = `

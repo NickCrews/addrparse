@@ -242,7 +242,7 @@ attribution from LICENSING.md, read at build time.
 `package/` builds the `nerdress` npm package: `impls/crf` with a model trained on the `full`
 suite's training set, embedded as base64, exporting `parse(text)` and `LABELS`
 (`package/index.ts`), with no dependencies and no `node:` imports. `package/package.json` is its
-manifest and holds the version; `README.md` is its npm page.
+manifest, and the root `package.json` holds its version; `README.md` is its npm page.
 
 ```sh
 pnpm package                                # train, then build dist/ (a few minutes, ~1 GB)

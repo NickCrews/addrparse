@@ -1,6 +1,5 @@
 {
   "name": "nerdress",
-  "version": "0.1.0",
   "description": "US address parser: a trained linear-chain CRF in plain JavaScript, no dependencies, for Node and browsers",
   "keywords": [
     "address",
