@@ -1,6 +1,6 @@
 /**
- * Entry point of the `addrparse` npm package: the CRF parser in impls/crf with a trained model
- * that package/build.ts embeds as base64 in place of `__ADDRPARSE_MODEL__`. The model is decoded
+ * Entry point of the `nerdress` npm package: the CRF parser in impls/crf with a trained model
+ * that package/build.ts embeds as base64 in place of `__NERDRESS_MODEL__`. The model is decoded
  * on the first `parse` call, so importing the package is cheap.
  *
  * The public types are declared here, not imported, so the emitted index.d.ts stands alone.
@@ -9,7 +9,7 @@ import { load } from "../impls/crf/load.ts";
 import { LABELS as LABEL_DESCRIPTIONS, type Label as InternalLabel } from "../src/labels.ts";
 import { asScoredParse, type Parser } from "../src/types.ts";
 
-declare const __ADDRPARSE_MODEL__: string;
+declare const __NERDRESS_MODEL__: string;
 
 /** Names follow usaddress and the FGDC US address standard; `LABELS` describes each one. */
 export type Label =
@@ -72,7 +72,7 @@ function fromBase64(s: string): Uint8Array {
 /** Splits a US address, or text containing one, into labeled spans. */
 export function parse(text: string): ParseResult {
   if (typeof text !== "string") throw new TypeError("parse() takes a string");
-  parser ??= load(fromBase64(__ADDRPARSE_MODEL__));
+  parser ??= load(fromBase64(__NERDRESS_MODEL__));
   const result = asScoredParse(parser.parse(text));
   return {
     spans: result.spans.map((s) => ({ ...s, text: text.slice(s.start, s.end) })),

@@ -31,7 +31,7 @@ recorded in the source files at the link above.
 
 Method of making it (ODbL 4.6)
 ------------------------------
-From a checkout of https://github.com/NickCrews/addrparse at the commit that last changed these
+From a checkout of https://github.com/NickCrews/nerdress at the commit that last changed these
 files:
 
     pnpm install

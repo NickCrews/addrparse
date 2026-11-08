@@ -36,7 +36,7 @@ describe("listDatasets", () => {
   });
 
   it("tags datasets by kind and reads .jsonl files as labeled", () => {
-    const dir = mkdtempSync(join(tmpdir(), "addrparse-datasets-"));
+    const dir = mkdtempSync(join(tmpdir(), "nerdress-datasets-"));
     writeFileSync(join(dir, "mine.jsonl"), "");
     writeFileSync(join(dir, "gen.ts"), "");
     const ds = listDatasets(dir);
@@ -46,7 +46,7 @@ describe("listDatasets", () => {
   });
 
   it("rejects names that can't be a slice or CLI token", () => {
-    const dir = mkdtempSync(join(tmpdir(), "addrparse-datasets-"));
+    const dir = mkdtempSync(join(tmpdir(), "nerdress-datasets-"));
     writeFileSync(join(dir, "My Data.jsonl"), "");
     assert.throws(() => listDatasets(dir), /lowercase/);
   });
@@ -95,7 +95,7 @@ describe("blendLabel", () => {
 });
 
 describe("blendedLines", () => {
-  const dir = mkdtempSync(join(tmpdir(), "addrparse-blend-"));
+  const dir = mkdtempSync(join(tmpdir(), "nerdress-blend-"));
   const write = (split: string, name: string, n: number) => {
     mkdirSync(join(dir, split), { recursive: true });
     const lines = Array.from({ length: n }, (_, i) => `{"id":"${name}:${i}"}\n`).join("");

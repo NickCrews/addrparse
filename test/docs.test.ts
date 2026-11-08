@@ -12,14 +12,14 @@ import { asScoredParse } from "../src/types.ts";
 const ROOT = join(import.meta.dirname, "..");
 
 test("docs build makes one page whose embedded models parse demo rows as the build did", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "addrparse-docs-"));
+  const dir = mkdtempSync(join(tmpdir(), "nerdress-docs-"));
   try {
     const out = join(dir, "index.html");
     execFileSync(
       process.execPath,
       [join(ROOT, "docs", "build.ts"), "--suite", "ci", "--out", out],
       {
-        env: { ...process.env, ADDRPARSE_DATA_DIR: join(ROOT, "test", "fixtures", "data") },
+        env: { ...process.env, NERDRESS_DATA_DIR: join(ROOT, "test", "fixtures", "data") },
         stdio: ["ignore", "ignore", "pipe"],
       },
     );

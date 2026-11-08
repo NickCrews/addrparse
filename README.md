@@ -1,4 +1,6 @@
-# addrparse
+# nerdress
+
+The name is NER (named-entity recognition) + address.
 
 US address parsing, ready for production:
 
@@ -14,7 +16,7 @@ US address parsing, ready for production:
 - **Recognizes non-addresses:** junk is labeled `NotAddress` instead of being forced into a parse.
 
 ```js
-import { parse } from "addrparse";
+import { parse } from "nerdress";
 const { spans, confidence } = parse(
   "CO John SMITH, 123 E St elias stree S,   Oklahoma City, OK 99507-1234",
 );
@@ -35,7 +37,7 @@ const { spans, confidence } = parse(
 ## API
 
 ```sh
-npm install addrparse
+npm install nerdress
 ```
 
 - Spans are character ranges `[start, end)` of the input, sorted and non-overlapping, with
@@ -126,6 +128,6 @@ documentation or about page:
 > https://github.com/openaddresses/openaddresses/tree/06015e09e15bbcfdaac7d10883665db66c4d1f1c/sources/us,
 > including Oregon Metro (ODbL 1.0), via libpostal's training data
 > (https://github.com/openvenues/libpostal). The data was relabeled and reformatted by
-> https://github.com/NickCrews/addrparse/tree/main/src/data.
+> https://github.com/NickCrews/nerdress/tree/main/src/data.
 
 The model stores hashed features and weights, not address strings.

@@ -58,7 +58,7 @@ export interface PageContext {
   generated: { at: string; git: string };
 }
 
-const REPO_URL = "https://github.com/NickCrews/addrparse";
+const REPO_URL = "https://github.com/NickCrews/nerdress";
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
@@ -114,8 +114,9 @@ function home(ctx: PageContext): string {
   });
   return `
 <section id="tab-home" class="tab" data-tab="home">
-<h1>addrparse</h1>
+<h1>nerdress</h1>
 <p class="lede">Parse US addresses into labeled parts using pure typescript, with exceptional accurary and performance.</p>
+<p>The name is NER (named-entity recognition) + address.</p>
 
 ${playground(ctx)}
 
@@ -135,9 +136,9 @@ FGDC United States Thoroughfare, Landmark, and Postal Address Data Standard.</p>
 ${table(["label", "meaning", "example"], labelRows, { cls: "labels" })}
 
 <h2 id="home-usage">Usage</h2>
-<p>The <code>addrparse</code> npm package is the <code>crf</code> parser with its model embedded:</p>
-<pre><code>npm install addrparse</code></pre>
-<pre><code>import { parse } from "addrparse";
+<p>The <code>nerdress</code> npm package is the <code>crf</code> parser with its model embedded:</p>
+<pre><code>npm install nerdress</code></pre>
+<pre><code>import { parse } from "nerdress";
 
 const { spans, confidence } = parse("12 N Main St Apt 4, Springfield, IL 62701");
 // spans: [{ start: 0, end: 2, label: "AddressNumber", text: "12" }, …]
@@ -570,13 +571,13 @@ export function renderPage(ctx: PageContext, assets: { css: string; js: string; 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>addrparse</title>
+<title>nerdress</title>
 <meta name="description" content="US address parsers in TypeScript: usage, metrics and an in-browser playground.">
 <style>${assets.css}${hueCss}</style>
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="#home">addrparse</a>
+  <a class="brand" href="#home">nerdress</a>
   <nav>
     <a href="#home" data-nav="home">Home</a>
     <a href="#metrics" data-nav="metrics">Metrics</a>

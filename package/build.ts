@@ -1,5 +1,5 @@
 /**
- * Builds the `addrparse` npm package into an output directory (default `dist/`):
+ * Builds the `nerdress` npm package into an output directory (default `dist/`):
  *
  *   index.js      package/index.ts bundled by esbuild, with the crf model embedded as base64
  *   index.d.ts    package/index.ts's declarations
@@ -11,7 +11,7 @@
  *
  * The model is the suite's crf model from the models/ cache that `pnpm eval` and `pnpm docs`
  * share, trained on the default blend first if missing (a few minutes and ~1 GB for `full`).
- * Training reads `$ADDRPARSE_DATA_DIR` like the harness does. Publish with `npm publish dist`.
+ * Training reads `$NERDRESS_DATA_DIR` like the harness does. Publish with `npm publish dist`.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -28,7 +28,7 @@ import { implSourceHash } from "../src/eval/impl.ts";
 import { ensureModel, gitInfo } from "../src/eval/models.ts";
 
 const PKG = import.meta.dirname;
-const REPO = "https://github.com/NickCrews/addrparse";
+const REPO = "https://github.com/NickCrews/nerdress";
 
 const { values: opts } = parseArgs({
   options: {
@@ -81,7 +81,7 @@ await build({
   format: "esm",
   platform: "neutral",
   target: "es2022",
-  define: { __ADDRPARSE_MODEL__: JSON.stringify(model.toString("base64")) },
+  define: { __NERDRESS_MODEL__: JSON.stringify(model.toString("base64")) },
   absWorkingDir: ROOT,
   logLevel: "warning",
 });
@@ -106,7 +106,7 @@ const release = `
 
 ## This release's model
 
-addrparse ${pkg.version} embeds a ${model.byteLength.toLocaleString("en-US")}-byte model (sha256
+nerdress ${pkg.version} embeds a ${model.byteLength.toLocaleString("en-US")}-byte model (sha256
 \`${modelSha}\`), the \`crf\` parser trained on the first
 ${config.trainExamples.toLocaleString("en-US")} examples of the default training blend, seed
 ${config.seed}, at commit [\`${git.sha.slice(0, 7)}\`](${REPO}/tree/${git.sha}). That commit's
@@ -126,7 +126,7 @@ writeFileSync(
 );
 
 log(
-  `built ${out} (addrparse ${pkg.version}, ${suite} model ` +
+  `built ${out} (nerdress ${pkg.version}, ${suite} model ` +
     `${model.byteLength.toLocaleString("en-US")} B, sha256 ${modelSha.slice(0, 12)}, ` +
     `commit ${git.sha.slice(0, 7)}${git.dirty ? "+dirty" : ""})`,
 );

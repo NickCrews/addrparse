@@ -223,7 +223,7 @@ describe("runJsonLines", () => {
 
 describe("lockedVersions", () => {
   it("reads package versions from a uv lockfile", () => {
-    const dir = mkdtempSync(join(tmpdir(), "addrparse-lock-"));
+    const dir = mkdtempSync(join(tmpdir(), "nerdress-lock-"));
     const lock = join(dir, "predict.py.lock");
     writeFileSync(
       lock,

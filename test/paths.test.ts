@@ -15,7 +15,7 @@ function dataDir(env: Record<string, string>): string {
       "-e",
       `import { datasetPath } from ${JSON.stringify(join(ROOT, "src/data/paths.ts"))}; console.log(datasetPath("dev", "osm"));`,
     ],
-    { cwd: ROOT, encoding: "utf8", env: { ...process.env, ADDRPARSE_DATA_DIR: "", ...env } },
+    { cwd: ROOT, encoding: "utf8", env: { ...process.env, NERDRESS_DATA_DIR: "", ...env } },
   );
   assert.equal(r.status, 0, r.stderr);
   return r.stdout.trim();
@@ -25,9 +25,9 @@ describe("DATA_DIR", () => {
   it("is data/ by default", () => {
     assert.equal(dataDir({}), join(ROOT, "data", "dev", "osm.jsonl"));
   });
-  it("is ADDRPARSE_DATA_DIR when set", () => {
+  it("is NERDRESS_DATA_DIR when set", () => {
     assert.equal(
-      dataDir({ ADDRPARSE_DATA_DIR: "test/fixtures/data" }),
+      dataDir({ NERDRESS_DATA_DIR: "test/fixtures/data" }),
       resolve(ROOT, "test/fixtures/data/dev/osm.jsonl"),
     );
   });

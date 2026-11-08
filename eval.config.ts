@@ -76,7 +76,7 @@ export const SUITES = {
     learningCurve: [],
   },
   /**
-   * Seconds. Runs on the committed fixture in test/fixtures/data (`ADDRPARSE_DATA_DIR`), which
+   * Seconds. Runs on the committed fixture in test/fixtures/data (`NERDRESS_DATA_DIR`), which
    * holds exactly this many examples; CI runs it for every impl.
    */
   ci: {
