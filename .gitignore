@@ -3,7 +3,7 @@ node_modules/
 models/
 /dist/
 results/predictions/
-# built docs: embed models trained on ODbL data (CONTRIBUTING.md "Data and licenses")
+# built docs: embed models trained on ODbL data (LICENSING.md)
 docs/dist/
 # runs of the ci suite on the fixture data (CI and local checks)
 results/runs/*__ci.json

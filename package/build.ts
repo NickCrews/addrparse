@@ -5,7 +5,7 @@
  *   index.d.ts    package/index.ts's declarations
  *   package.json  package/package.json
  *   README.md     the repo's README.md plus a section on this release's model
- *   LICENSE       the repo's LICENSE plus the model attribution from CONTRIBUTING.md
+ *   LICENSE       the repo's LICENSE plus the model attribution from LICENSING.md
  *
  *   pnpm package [--suite full] [--out dir] [--model models/crf/<key>.bin]
  *

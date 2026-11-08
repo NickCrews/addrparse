@@ -126,16 +126,7 @@ For more info, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License and data attribution
 
-The code is MIT-licensed. The embedded model was trained on data under the Open Database License
-and other terms; if you ship this package in an app, keep this attribution in your app's
-documentation or about page:
-
-> Trained on address data from © OpenStreetMap contributors, available under the Open Database
-> License (https://www.openstreetmap.org/copyright), and from OpenAddresses
-> (https://openaddresses.io) and the government sources listed at
-> https://github.com/openaddresses/openaddresses/tree/06015e09e15bbcfdaac7d10883665db66c4d1f1c/sources/us,
-> including Oregon Metro (ODbL 1.0), via libpostal's training data
-> (https://github.com/openvenues/libpostal). The data was relabeled and reformatted by
-> https://github.com/NickCrews/nerdress/tree/main/src/data.
-
-The model stores hashed features and weights, not address strings.
+The code is MIT-licensed. The embedded model was trained on OpenStreetMap and OpenAddresses data;
+if you ship this package in an app, you need to include an attribution. See
+[LICENSING.md](https://github.com/NickCrews/nerdress/blob/main/LICENSING.md) for the text and
+details.

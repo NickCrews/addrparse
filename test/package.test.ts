@@ -45,12 +45,6 @@ test("package/build.ts builds an importable package from the fixture data", asyn
   assert.throws(() => mod.parse(42 as unknown as string), TypeError);
 });
 
-test("README.md carries the model attribution from CONTRIBUTING.md", () => {
-  const readme = readFileSync(join(ROOT, "README.md"), "utf8")
-    .split("\n")
-    .filter((l) => l.startsWith(">"))
-    .map((l) => l.replace(/^>\s?/, ""))
-    .join(" ")
-    .replace(/\s+/g, " ");
-  assert.ok(readme.includes(readAttribution()));
+test("LICENSING.md carries the model attribution", () => {
+  assert.match(readAttribution(), /^Trained on address data from © OpenStreetMap contributors/);
 });

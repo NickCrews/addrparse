@@ -51,7 +51,7 @@ export interface PageContext {
   /** Models embedded in the page: raw and gzip bytes. */
   embedded: Record<string, { bytes: number; gzipBytes: number }>;
   stats?: DataStats;
-  /** The model attribution paragraph from CONTRIBUTING.md, as plain text. */
+  /** The model attribution paragraph from LICENSING.md, as plain text. */
   attribution: string;
   /** Preset sets sampled from the dev split, and the distinct texts in them. */
   demo: { sets: number; rows: number };
@@ -413,7 +413,7 @@ ${list([
   `The method of making the training data is <a href="${REPO_URL}/tree/main/src/data">src/data/</a> in the repository.`,
   "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
 ])}
-<p>This is a reading of the licenses, not legal advice; see the repository's CONTRIBUTING.md.</p>
+<p>This is a reading of the licenses, not legal advice; see <a href="${REPO_URL}/blob/main/LICENSING.md">LICENSING.md</a>.</p>
 </section>`;
 }
 

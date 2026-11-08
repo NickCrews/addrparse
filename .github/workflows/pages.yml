@@ -2,8 +2,7 @@ name: pages
 
 # Builds the user docs (`pnpm docs`, the full suite) and publishes them to GitHub Pages.
 # The page embeds models trained on ODbL data; it carries the attribution, and building from a
-# pushed commit of main gives it the source link ODbL §4.6 asks for (CONTRIBUTING.md "Data and
-# licenses").
+# pushed commit of main gives it the source link ODbL §4.6 asks for (LICENSING.md).
 
 on:
   push:
