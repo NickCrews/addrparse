@@ -247,7 +247,7 @@ manifest, and the root `package.json` holds its version; `README.md` is its npm 
 ```sh
 pnpm package                                # train, then build dist/ (a few minutes, ~1 GB)
 pnpm package --model models/crf/<key>.bin   # reuse a model `pnpm eval crf --suite full` cached
-npm publish dist
+npm publish ./dist
 ```
 
 `pnpm package` writes `dist/` (gitignored): the bundle, its `.d.ts`, the manifest, `README.md`

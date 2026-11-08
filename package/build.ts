@@ -13,7 +13,8 @@
  * share, trained on the default blend first if missing (a few minutes and ~1 GB for `full`).
  * `--model` embeds that file instead; the README still describes it as the suite's model, so pass
  * one that `pnpm eval crf --suite <suite>` trained at this commit.
- * Training reads `$NERDRESS_DATA_DIR` like the harness does. Publish with `npm publish dist`.
+ * Training reads `$NERDRESS_DATA_DIR` like the harness does. Publish with `npm publish ./dist`
+ * (npm reads a bare `dist` as a registry package name).
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
