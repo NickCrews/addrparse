@@ -29,24 +29,9 @@ export const IMPL_NOTES: Record<string, ImplNotes> = {
     ],
     cons: [
       "Labels whole tokens, so it can't split a token holding two parts, such as Apt4.",
-      "Training is far slower and uses far more memory than lookup's (see the training rows).",
       "US formats only.",
     ],
     use: "The default for parsing US addresses in a browser or Node.",
-  },
-  lookup: {
-    summary: "Context-free baseline: a table from word to label.",
-    architecture:
-      "Each lowercased token gets the label it had most often in training; tokens not seen in " +
-      "training get the most common label overall. The confidence is the share of tokens seen in " +
-      "training.",
-    pros: ["Tiny code, trains in seconds.", "Easy to inspect: the model is a JSON table."],
-    cons: [
-      "No context: a word gets one label wherever it appears, so most multi-word addresses have an error.",
-      "The model is a vocabulary of street and place names, so it is large and holds part of the training data.",
-      "The confidence doesn't separate right parses from wrong ones well.",
-    ],
-    use: "A floor for other parsers to beat. Not for real use.",
   },
   usaddress: {
     summary:

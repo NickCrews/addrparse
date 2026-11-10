@@ -226,9 +226,9 @@ errors, or trains a different model twice from the same data.
 ## Docs
 
 `pnpm docs` builds `docs/dist/index.html`, one self-contained page for users of the parsers:
-usage, the label set, what is measured and why, the training data, a comparison of every impl,
-and a playground that runs `crf` and `lookup` in the browser with their models embedded. Numbers
-come from the latest run of each impl in the suite (`--suite`, default `full`) and from
+usage, the label set, what is measured and why, the training data, a comparison of the impls
+other than `noop` and `lookup`, and a playground that runs `crf` in the browser with its model
+embedded. Numbers come from the latest run of each impl in the suite (`--suite`, default `full`) and from
 `data/stats.json`. Models come from the `models/` cache for that suite, trained first if missing.
 Demo rows are seeded samples of the dev split, picked by running the models at build time; the
 references' columns come from their saved predictions (`results/predictions/`).
