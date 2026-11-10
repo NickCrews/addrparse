@@ -1,5 +1,5 @@
 /**
- * Renders the page's static HTML at build time: the Home, Metrics and Models tabs and the
+ * Renders the page's static HTML at build time: the Home, Datasets, Metrics and Models tabs and the
  * playground's skeleton on Home (docs/app.ts makes it interactive). Every number comes from the run
  * files, data/stats.json or a parse made during the build.
  */
@@ -9,6 +9,7 @@ import { HEADLINE, type Metric } from "../src/eval/headline.ts";
 import type { RunResult } from "../src/eval/results.ts";
 import { DATASET_WEIGHTS } from "../eval.config.ts";
 import { esc } from "./html.ts";
+import { DATASET_GROUPS, DATASET_NOTES } from "./dataset-notes.ts";
 import { IMPL_NOTES } from "./impl-notes.ts";
 
 export interface DataStats {
@@ -222,18 +223,20 @@ const METRIC_GROUPS: { title: string; metrics: string[]; why: string }[] = [
   },
 ];
 
-function trainingData(s: DataStats, suite: string): string {
+function sourceTable(s: DataStats): string {
   const sources = Object.keys(s.linesReadBySource);
   const rejected = (src: string) => sum(Object.values(s.rejectedBySource[src] ?? {}));
   const total = sum(Object.values(s.bySource));
   const others = Object.keys(s.bySource).filter((src) => !sources.includes(src));
-  const sourceRows = [
+  const rows = [
     ...[...sources, ...others].map((src) => {
       const read = sources.includes(src);
       const n = s.bySource[src] ?? 0;
-      const kind = s.datasets?.[src]?.kind === "labeled" ? "labeled" : "synthetic";
       return [
-        read ? code(src) : `${code(src)} (${kind})`,
+        DATASET_NOTES[src] || s.datasets?.[src]?.description
+          ? `<a href="#datasets/${esc(src)}">${code(src)}</a>`
+          : code(src),
+        esc(datasetKind(s, src)),
         String(DATASET_WEIGHTS[src] ?? 1),
         read ? int(s.linesReadBySource[src]!) : "–",
         read ? int(rejected(src)) : "–",
@@ -245,6 +248,7 @@ function trainingData(s: DataStats, suite: string): string {
     [
       "total",
       "",
+      "",
       int(s.linesRead),
       int(sum(Object.values(s.rejected))),
       int(s.duplicates),
@@ -252,6 +256,65 @@ function trainingData(s: DataStats, suite: string): string {
       "",
     ],
   ];
+  return table(
+    ["dataset", "kind", "weight", "lines read", "rejected", "duplicates", "examples", "share"],
+    rows,
+    { align: ["l", "l", "r", "r", "r", "r", "r", "r"] },
+  );
+}
+
+function datasetKind(s: DataStats | undefined, name: string): string {
+  if (s?.linesReadBySource[name] !== undefined) return "libpostal";
+  if (name === "junk" || name === "embedded") return "not-address";
+  return s?.datasets?.[name]?.kind ?? "synthetic";
+}
+
+function datasetSection(s: DataStats | undefined, name: string): string {
+  const n = DATASET_NOTES[name];
+  const description = s?.datasets?.[name]?.description;
+  const examples = s?.bySource[name];
+  const total = s ? sum(Object.values(s.bySource)) : 0;
+  const facts = [
+    `weight ${DATASET_WEIGHTS[name] ?? 1}`,
+    ...(examples !== undefined
+      ? [`${int(examples)} examples`, `${pct(examples / total)} of all`]
+      : []),
+    ...(name === "junk" && s
+      ? [`made after ${pct(s.notAddress.junkRate, 0)} of address examples`]
+      : []),
+    ...(name === "embedded" && s
+      ? [`made from ${pct(s.notAddress.embeddedRate, 0)} of address examples`]
+      : []),
+  ];
+  return `
+<h3 id="datasets-${esc(name)}">${code(name)}</h3>
+<p class="dim">${facts.join(" · ")}</p>
+${n ? `<p>${esc(n.what)}</p>` : description ? `<p>${esc(description)}.</p>` : ""}
+${n ? `<p><strong>Why:</strong> ${esc(n.why)}</p>` : ""}
+${n?.weaknesses.length ? `<p><strong>Weaknesses:</strong></p>${list(n.weaknesses.map(esc))}` : ""}`;
+}
+
+function sources(s: DataStats | undefined): string {
+  const grouped = new Set(DATASET_GROUPS.flatMap((g) => g.datasets));
+  const others = Object.keys(s?.bySource ?? {}).filter((d) => !grouped.has(d));
+  return [
+    ...DATASET_GROUPS.map(
+      (g) => `
+<h3 id="datasets-${g.id}">${esc(g.title)}</h3>
+<p>${esc(g.intro)}</p>
+<p><strong>Weaknesses of all of them:</strong></p>
+${list(g.weaknesses.map(esc))}
+${g.datasets.map((d) => datasetSection(s, d)).join("\n")}`,
+    ),
+    ...(others.length
+      ? [
+          `<h3 id="datasets-other">Other datasets</h3>${others.map((d) => datasetSection(s, d)).join("\n")}`,
+        ]
+      : []),
+  ].join("\n");
+}
+
+function splitsAndNoise(s: DataStats, suite: string): string {
   const noiseRows = Object.entries(s.noise.rates).map(([n, rate]) => [
     code(n),
     pct(rate, 0),
@@ -264,45 +327,27 @@ function trainingData(s: DataStats, suite: string): string {
     .sort((a, b) => b[1] - a[1])
     .map(([r, n]) => [code(r), int(n)]);
   return `
-<p>Most examples come from libpostal's parser training data (snapshot ${code(s.libpostalSnapshot)}), filtered to
-the US, relabeled into the label set above, deduplicated and split by a hash of the address. Synthetic
-datasets add address forms libpostal's data barely has: PO boxes as people write them, rural and highway
-contract routes, general delivery, mileposts and military mail. ${code("ak-voterfile")} is real addresses from
-Alaska's voter file with the rural forms none of the others have (lot and block, house numbers on unnumbered
-village streets, named housing, directions, C/O lines). ${code("ak-apoc")} is real addresses from Alaska
-campaign finance reports, picked where the parser trained without it went wrong: what people type into a
-web form's address, city, state and ZIP boxes, including business names, notes and placeholders. Each dataset is stored on its own, and a
-split is interleaved from them by weight when it is loaded, so every prefix of a split has the same mix.</p>
-${table(
-  ["source", "weight", "lines read", "rejected", "duplicates", "examples", "share"],
-  sourceRows,
-  { align: ["l", "r", "r", "r", "r", "r", "r"] },
-)}
-${list([
-  `${code("openaddresses")}: government address points (number, street, city, state, ZIP).`,
-  `${code("osm")}: OpenStreetMap addresses, often with units, PO boxes and countries.`,
-  `${code("ways")}: OpenStreetMap streets with a place, no house number.`,
-  `${code("places")}: OpenStreetMap places alone (city, state, ZIP).`,
-  `${code("junk")}: synthetic text that is not an address (placeholders, emails, phone numbers, names, ordinary words), all NotAddress; made after ${pct(s.notAddress.junkRate, 0)} of address examples.`,
-  `${code("embedded")}: a real address inside other text ("Mail to … thanks"), or after a person's name as its Recipient; made from ${pct(s.notAddress.embeddedRate, 0)} of address examples.`,
-  ...Object.entries(s.datasets ?? {})
-    .filter(([, d]) => d.description)
-    .map(([name, d]) => `${code(name)}: ${esc(d.description!)}.`),
-])}
-<h3>Splits</h3>
+<h2 id="datasets-splits">Splits</h2>
+<p>Every dataset is split into train, dev and test by a hash of the address, so the same address is
+always in the same split.</p>
 ${table(
   ["split", "examples", "share"],
   Object.entries(s.bySplit).map(([k, n]) => [code(k), int(n), pct(n / s.examples)]),
   { align: ["l", "r", "r"] },
 )}
 <p>Hill-climbing uses dev only. Test is scored rarely so it stays an unbiased estimate. The ${code(suite)} suite trains on the first examples of train and scores the first examples of dev.</p>
-<h3>Formatting noise</h3>
-<p>After splitting, seeded transforms rewrite some examples (text and labels together), so robustness to
-messy input is measured. ${int(s.noise.clean)} examples are left clean.</p>
+
+<h2 id="datasets-noise">Formatting noise</h2>
+<p>After splitting, seeded transforms rewrite some examples of the libpostal and synthetic datasets
+(text and labels together), so robustness to messy input is measured. ${int(s.noise.clean)} examples
+are left clean.</p>
 ${table(["transform", "rate", "examples"], noiseRows, { align: ["l", "r", "r"] })}
-<h3>Label counts</h3>
+
+<h2 id="datasets-labels">Label counts</h2>
 ${table(["label", "spans"], labelRows, { align: ["l", "r"] })}
-<h3>Rejected lines</h3>
+
+<h2 id="datasets-rejected">Rejected lines</h2>
+<p>libpostal lines dropped while relabeling, by reason.</p>
 ${table(["reason", "lines"], rejectedRows, { align: ["l", "r"] })}`;
 }
 
@@ -367,14 +412,56 @@ function machines(ctx: PageContext): string {
   );
 }
 
-function metricsTab(ctx: PageContext): string {
+function datasetsTab(ctx: PageContext): string {
   const s = ctx.stats;
   return `
+<section id="tab-datasets" class="tab" data-tab="datasets">
+<h1>Datasets</h1>
+
+<h2 id="datasets-summary">Summary</h2>
+<p>Training and eval examples come from four kinds of dataset:</p>
+${list([
+  `<a href="#datasets/libpostal">libpostal's training data</a> (snapshot ${code(s?.libpostalSnapshot ?? "unknown")}): US addresses from OpenStreetMap and OpenAddresses, relabeled into this label set. Most of the examples.`,
+  `<a href="#datasets/not-address">Text that is not an address</a>: synthetic junk, and addresses wrapped in other text, so a parser can abstain.`,
+  `<a href="#datasets/synthetic">Synthetic address forms</a>: PO boxes, rural and highway contract routes, general delivery, mileposts and military mail, which libpostal's data barely has.`,
+  `<a href="#datasets/labeled">Real addresses from Alaska</a>: voter-file and campaign finance addresses with the rural forms and form-entry mess the others lack.`,
+])}
+<p>Each dataset is stored on its own. A split is interleaved from them by weight when it is loaded, so
+every prefix of a split has the same mix. The eval set always uses the default weights below; a
+training run can use another blend (see <a href="${REPO_URL}/blob/main/datasets/README.md">datasets/README.md</a>),
+and the <code>source=&lt;dataset&gt;</code> slices on the Models tab show how each dataset's examples fared.</p>
+${s ? sourceTable(s) : "<p>data/stats.json not found when this page was built.</p>"}
+
+<h2 id="datasets-sources">Sources</h2>
+${sources(s)}
+
+<h2 id="datasets-gold">Gold labels</h2>
+${goldSection(s)}
+${s ? splitsAndNoise(s, ctx.suite) : ""}
+
+<h2 id="datasets-licenses">Licenses</h2>
+<p>The code is MIT-licensed. The models embedded in this page, and the demo examples in the
+playground, are made from data under the Open Database License and other terms:</p>
+<blockquote class="attribution">${linkify(ctx.attribution)}</blockquote>
+${list([
+  `Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>.`,
+  `Address data from <a href="https://openaddresses.io">OpenAddresses</a> and its government sources, under each source's terms.`,
+  `Via <a href="https://github.com/openvenues/libpostal">libpostal</a>'s parser training data, snapshot ${code(s?.libpostalSnapshot ?? "unknown")}.`,
+  `The method of making the training data is <a href="${REPO_URL}/tree/main/src/data">src/data/</a> in the repository.`,
+  "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
+])}
+<p>This is a reading of the licenses, not legal advice; see <a href="${REPO_URL}/blob/main/LICENSING.md">LICENSING.md</a>.</p>
+</section>`;
+}
+
+function metricsTab(ctx: PageContext): string {
+  return `
 <section id="tab-metrics" class="tab" data-tab="metrics">
-<h1>Metrics and data</h1>
+<h1>Metrics</h1>
 <p>Every parser is trained and measured by the same harness (<code>pnpm eval</code>). Each
 measurement runs in a fresh process; every run is saved with its configuration, data hashes, code
-version and machine. The numbers are in the comparison table on the Models tab.</p>
+version and machine. The numbers are in the comparison table on the Models tab, and the data they
+are measured on is on the Datasets tab.</p>
 
 <h2 id="metrics-what">What is measured, and why</h2>
 ${METRIC_GROUPS.map(
@@ -384,12 +471,6 @@ ${METRIC_GROUPS.map(
 <p>Suite ${code(ctx.suite)}: trained on ${int(ctx.trainExamples)} examples, scored on
 ${int(ctx.evalExamples)} dev examples, seed ${ctx.seed}. Speed and memory are measured only for the
 TypeScript parsers; the references run as Python subprocesses, whose timings aren't comparable.</p>
-
-<h2 id="metrics-data">Training data</h2>
-${s ? trainingData(s, ctx.suite) : "<p>data/stats.json not found when this page was built.</p>"}
-
-<h2 id="metrics-gold">Gold labels</h2>
-${goldSection(s)}
 
 <h2 id="metrics-non-goals">Non-goals</h2>
 ${list([
@@ -403,19 +484,6 @@ ${list([
 <h2 id="metrics-machines">Machines</h2>
 <p>Timings are from these machines. Runs on different machines aren't directly comparable.</p>
 ${machines(ctx)}
-
-<h2 id="metrics-licenses">Data and licenses</h2>
-<p>The code is MIT-licensed. The models embedded in this page, and the demo examples in the
-playground, are made from data under the Open Database License and other terms:</p>
-<blockquote class="attribution">${linkify(ctx.attribution)}</blockquote>
-${list([
-  `Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://opendatacommons.org/licenses/odbl/1-0/">ODbL 1.0</a>.`,
-  `Address data from <a href="https://openaddresses.io">OpenAddresses</a> and its government sources, under each source's terms.`,
-  `Via <a href="https://github.com/openvenues/libpostal">libpostal</a>'s parser training data, snapshot ${code(s?.libpostalSnapshot ?? "unknown")}.`,
-  `The method of making the training data is <a href="${REPO_URL}/tree/main/src/data">src/data/</a> in the repository.`,
-  "The demo examples are a small extract of the dev split, which is a Derivative Database of OpenStreetMap under ODbL 1.0.",
-])}
-<p>This is a reading of the licenses, not legal advice; see <a href="${REPO_URL}/blob/main/LICENSING.md">LICENSING.md</a>.</p>
 </section>`;
 }
 
@@ -583,6 +651,7 @@ export function renderPage(ctx: PageContext, assets: { css: string; js: string; 
   <a class="brand" href="#home">nerdress</a>
   <nav>
     <a href="#home" data-nav="home">Home</a>
+    <a href="#datasets" data-nav="datasets">Datasets</a>
     <a href="#metrics" data-nav="metrics">Metrics</a>
     <a href="#models" data-nav="models">Models</a>
   </nav>
@@ -590,13 +659,14 @@ export function renderPage(ctx: PageContext, assets: { css: string; js: string; 
 </header>
 <main>
 ${home(ctx)}
+${datasetsTab(ctx)}
 ${metricsTab(ctx)}
 ${modelsTab(ctx)}
 </main>
 <footer>
 Built ${esc(ctx.generated.at)} from ${code(ctx.generated.git)} by <code>pnpm docs</code>.
 Models trained on data © OpenStreetMap contributors (ODbL) and OpenAddresses sources;
-<a href="#metrics/licenses">details</a>.
+<a href="#datasets/licenses">details</a>.
 Source on <a href="${REPO_URL}">GitHub</a>.
 </footer>
 <script id="page-data" type="application/json">${assets.data}</script>
