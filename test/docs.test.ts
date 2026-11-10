@@ -24,7 +24,7 @@ test("docs build makes one page whose embedded models parse demo rows as the bui
       },
     );
     const html = readFileSync(out, "utf8");
-    for (const tab of ["home", "metrics", "models"]) {
+    for (const tab of ["home", "datasets", "metrics", "models"]) {
       assert.match(html, new RegExp(`data-tab="${tab}"`));
     }
     assert.match(html, /OpenStreetMap contributors/);
