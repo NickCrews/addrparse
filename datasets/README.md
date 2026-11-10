@@ -61,7 +61,7 @@ Forms of address that people put on forms and that libpostal's data barely has:
 | `milepost`         | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy |
 | `military`         | PSC 1234, Box 5678, APO AE 09204        |
 
-And one hand-labeled dataset, `ak-voterfile` (below).
+And two labeled datasets of real addresses, `ak-voterfile` and `ak-apoc` (below).
 
 ## `ak-voterfile.jsonl`: Alaska voter-file addresses
 
@@ -99,6 +99,49 @@ Labeling conventions beyond `src/labels.ts`:
 - Words that glue two fields are split where the tokenizer splits them (`src/tokens.ts`), and
   each part gets its own label: `APT.9` is OccupancyType `APT.` and OccupancyIdentifier `9`,
   `HC60` is USPSBoxGroupType `HC` and USPSBoxGroupID `60`.
+
+## `ak-apoc.jsonl`: Alaska campaign finance addresses
+
+Real addresses from the Alaska Public Offices Commission's campaign finance reports (contributions,
+expenditures, debts and registrations), as republished by
+[apoc-data](https://github.com/NickCrews/apoc-data) (release `20261106-191557`). Filers type the
+other party's address into separate address, city, state and ZIP boxes, so the data has what web
+forms collect: suite and PMB numbers, units with no designator (`Harris St 329`), misspelt types
+(`Strreet`, `Avve`), the city, state or ZIP typed into the address box too, business names and
+notes in the address (`Anedot.com`, `NOTE-Out of state donation refunded`), placeholders (`N/A`,
+`Not provided`, `TBD`), and ZIPs that lost their leading 0 or are a dollar amount. About 70% are in
+Alaska and the rest elsewhere in the US. Non-US addresses are left out.
+
+Each row is rendered as `address, city, state zip`, or as the address alone when it already ends
+with its city, state or ZIP. The state is APOC's full name ("Alaska"). Rows that differ only in
+their digits or case count as one shape, and the most frequent row of each shape is kept: 129,559
+shapes. The fields are labeled by the rules in `scripts/ak-apoc/rules.ts` where the shape is one
+they cover (113,276 shapes), otherwise by `scripts/ak-apoc/hand.jsonl`: 1,143 lines, the most
+frequent of each coarse shape of the rest, labeled by an LLM correcting the parse of the model below
+to the conventions here and in `ak-voterfile`. The other 15,140 shapes are left out.
+
+Only the shapes that the published model (nerdress 0.1.0, trained with `ak-voterfile`) parses
+differently from the labels, or with confidence under 0.9, are kept: 4,761 examples, of them 100 of
+the 682 with a dollar amount for a ZIP. To rebuild:
+
+```sh
+uv run scripts/ak-apoc/extract.py 20261106-191557 data/raw/apoc.jsonl
+node scripts/ak-apoc/build.ts --addresses data/raw/apoc.jsonl --model <nerdress 0.1.0 model.bin>
+```
+
+Labeling conventions beyond `ak-voterfile`'s:
+
+- A placeholder in any field (`N/A`, `Unknown`, `None`, `TBD`, `$95.00` as the ZIP) is
+  NotAddress. A ZIP that is mistyped but still a number (`9080`, `995203`, `99,501.00`) is ZipCode.
+- A business, agency or campus name in the address box is Recipient (`Wells Fargo Bank`, `UAF`,
+  `eXp Realty LLC`); a named building, mall, station or facility is LandmarkName (`State Capitol`,
+  `Nugget Mall`, `Spenard PO`).
+- Notes, emails, URLs, phone numbers and reference numbers are NotAddress.
+- `PMB`, `Mailbox`, `Bldg`, `Room` and `Condo` numbers are OccupancyType and OccupancyIdentifier;
+  `ST E` after a road with its type is a suite (`3875 Geist Rd ST E`).
+- `Northern Lights`, Anchorage's Northern Lights Blvd written without its type, is the name.
+- A road that ends in a word that is also a USPS type but usually part of a name, with no other
+  type (`Crooked Tree`, `Wood Hall`, `Lake Otis`), is all StreetName.
 
 ## Training on another blend
 

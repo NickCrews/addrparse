@@ -67,7 +67,7 @@ async function train(a: TrainArgs) {
     peakRssOverBaselineMB: (windowPeak - rssBefore) / MB,
     baselineRssMB: rssBefore / MB,
     peakHeapOverBaselineMB: heap.peakOverBaseline / MB,
-    allocatedMB: heap.allocated / MB,
+    allocatedMB: heap.allocated === undefined ? undefined : heap.allocated / MB,
     modelBytes: result.model.byteLength,
     info: result.info ?? {},
   };

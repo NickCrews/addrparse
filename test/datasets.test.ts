@@ -36,6 +36,7 @@ describe("listDatasets", () => {
       "milepost",
       "military",
       "ak-voterfile",
+      "ak-apoc",
     ]) {
       assert.ok(all.includes(name), name);
     }

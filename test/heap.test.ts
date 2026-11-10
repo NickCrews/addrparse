@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import v8 from "node:v8";
 import { startHeapWindow } from "../src/eval/heap.ts";
 
 const MB = 1024 * 1024;
+/** Node before 26 has no allocation counter, and the window's `allocated` is undefined. */
+const counted = "total_allocated_bytes" in v8.getHeapStatistics();
+
+/** Asserts `allocated` is at least `min` bytes, or undefined without the counter. */
+function assertAllocated(allocated: number | undefined, min: number) {
+  if (!counted) return assert.equal(allocated, undefined);
+  assert.ok(allocated !== undefined && allocated >= min, `allocated ${allocated! / MB} MB`);
+}
 
 test("counts collected garbage in allocated and retained memory in the peak", () => {
   const end = startHeapWindow();
@@ -15,7 +24,7 @@ test("counts collected garbage in allocated and retained memory in the peak", ()
   const weights = new Float64Array(2 * MB);
   const w = end();
   assert.ok(w.peakOverBaseline >= 16 * MB, `peak ${w.peakOverBaseline / MB} MB`);
-  assert.ok(w.allocated >= 2 * w.peakOverBaseline, `allocated ${w.allocated / MB} MB`);
+  assertAllocated(w.allocated, 2 * w.peakOverBaseline);
   assert.equal(kept.length + weights.length, 100_000 + 2 * MB);
 });
 
@@ -34,5 +43,5 @@ test("catches a peak that is freed before the window ends", () => {
   const w = end();
   assert.equal(transient, undefined);
   if (gc) assert.ok(w.peakOverBaseline >= 32 * MB, `peak ${w.peakOverBaseline / MB} MB`);
-  assert.ok(w.allocated >= 32 * MB, `allocated ${w.allocated / MB} MB`);
+  assertAllocated(w.allocated, 32 * MB);
 });
