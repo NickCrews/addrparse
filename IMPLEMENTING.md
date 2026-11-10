@@ -19,8 +19,8 @@ The repo is an eval harness built for hill-climbing parsers. Read `CONTRIBUTING.
   `{ spans, confidence }`. Training and inference run in separate processes and share only the
   model bytes.
 - `src/labels.ts` (including `NotAddress`), `src/tokens.ts`.
-- `impls/lookup/`: the context-free baseline to beat (`pnpm compare` shows its numbers);
-  `index.ts` trains, `load.ts` parses.
+- `impls/crf/`: the parser to beat (`pnpm compare` shows its numbers); `index.ts` trains,
+  `load.ts` parses.
 - `impls/usaddress`, `impls/libpostal`: reference parsers, accuracy only, for context.
 - `eval.config.ts`: suites and knobs.
 - `src/data/refine.ts` and `src/data/street-suffixes.ts`: lexicons usable as features.
@@ -89,13 +89,13 @@ Hill-climb on the dev split only. Never look at or evaluate on the test split.
   bug, and report it.
 - Code comments state current behaviour, not history; no mannered prose.
 - Add tests for non-trivial pieces (Viterbi, serialization round-trip) in `test/<name>*.test.ts`.
-- When done: run `pnpm eval <name> lookup --suite full` once, then `pnpm check` (`pnpm fmt`
+- When done: run `pnpm eval <name> crf --suite full` once, then `pnpm check` (`pnpm fmt`
   formats).
 
 ## Report
 
 - A table of the main iterations: change → dev exact match, token accuracy, AURC, p50 µs, model
   gzip size, training seconds.
-- Final full-suite numbers vs `lookup`.
+- Final full-suite numbers vs `crf`.
 - The dominant remaining error categories (from `pnpm errors`).
 - Ideas not tried.

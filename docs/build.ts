@@ -30,8 +30,8 @@ import type { PageData } from "./page-data.ts";
 import { renderPage, type DataStats, type PageContext } from "./page.ts";
 import { LOADERS } from "./parsers.ts";
 
-/** Impls the page leaves out: the harness's floor (noop) and baseline (lookup). */
-const SKIP = new Set(["noop", "lookup"]);
+/** Impls the page leaves out; noop is the harness's floor, not a parser. */
+const SKIP = new Set(["noop"]);
 
 const { values: opts } = parseArgs({
   options: {
