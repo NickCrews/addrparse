@@ -112,6 +112,8 @@ function home(ctx: PageContext): string {
     const [meaning, example] = LABELS[l].split(/: (?=[^:]*$)/);
     return [`<mark class="lab" data-label="${l}">${l}</mark>`, esc(meaning!), esc(example ?? "")];
   });
+  const crf = runOf(ctx, "crf");
+  const crfMetric = (name: string) => fmt(metric(name), crf);
   return `
 <section id="tab-home" class="tab" data-tab="home">
 <h1>nerdress</h1>
@@ -122,9 +124,13 @@ ${playground(ctx)}
 
 <h2 id="home-goals">What</h2>
 ${list([
-  "99.87% per-token accuracy, 98.45% exact match.",
-  "Run anywhere: Zero dependencies, pure typescript, 338 KB gzipped model size.",
-  "Performant: ~78k/sec per thread, 29us p99 latency, peak memory of 18Mb (all on M1 Mac).",
+  ...(crf
+    ? [
+        `${crfMetric("token accuracy")} per-token accuracy, ${crfMetric("exact match")} exact match (<code>crf</code>, ${esc(crf.config.split)} split).`,
+        `Run anywhere: Zero dependencies, pure typescript, ${crfMetric("model size gzip")} gzipped model size.`,
+        `Performant: ${crfMetric("throughput/s 1 thread")}/sec per thread, ${crfMetric("latency p99 µs")} µs p99 latency, ${crfMetric("infer RSS over baseline")} peak memory (on ${esc(crf.machine.cpu)}).`,
+      ]
+    : []),
   "Say how sure each parse is, so a caller can accept confident parses and review the rest.",
   "Recognize text that is not an address and label it <code>NotAddress</code> instead of forcing a parse.",
   "Every claim backed by a saved, reproducible measurement (the Metrics tab).",

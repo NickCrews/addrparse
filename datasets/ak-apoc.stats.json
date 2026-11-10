@@ -1,0 +1,12 @@
+{
+  "model": "b4f7b88ee53731ba17104f256d93031b6dd9bbfde84ccd5965c28403f28afe7e",
+  "shapes": 129559,
+  "rules": 113276,
+  "hand": 1143,
+  "residue": 15140,
+  "kept": 4761,
+  "wrong": 2135,
+  "unsure": 2626,
+  "moneyZips": 682,
+  "moneyZipsKept": 100
+}

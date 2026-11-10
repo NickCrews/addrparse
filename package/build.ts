@@ -4,7 +4,8 @@
  *   index.js      package/index.ts bundled by esbuild, with the crf model embedded as base64
  *   index.d.ts    package/index.ts's declarations
  *   package.json  package/package.json with the version from the root package.json
- *   README.md     the repo's README.md plus a section on this release's model
+ *   README.md     the repo's README.md, without its `pnpm readme` markers, plus a section on
+ *                 this release's model
  *   LICENSE       the repo's LICENSE plus the model attribution from LICENSING.md
  *
  *   pnpm package [--suite full] [--out dir] [--model models/crf/<key>.bin]
@@ -13,6 +14,8 @@
  * share, trained on the default blend first if missing (a few minutes and ~1 GB for `full`).
  * `--model` embeds that file instead; the README still describes it as the suite's model, so pass
  * one that `pnpm eval crf --suite <suite>` trained at this commit.
+ * For `--suite full` the model's sha256 must be the one results/readme.json pins, and
+ * `readmeProblems()` (scripts/readme.ts) must find nothing, so README.md's numbers describe it.
  * Training reads `$NERDRESS_DATA_DIR` like the harness does. Publish with `npm publish ./dist`
  * (npm reads a bare `dist` as a registry package name).
  */
@@ -20,7 +23,6 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { build } from "esbuild";
 import ts from "typescript";
 import { SUITES, type SuiteName } from "../eval.config.ts";
 import { load } from "../impls/crf/load.ts";
@@ -29,6 +31,8 @@ import { defaultWeights } from "../src/data/load.ts";
 import { ROOT } from "../src/data/paths.ts";
 import { implSourceHash } from "../src/eval/impl.ts";
 import { ensureModel, gitInfo } from "../src/eval/models.ts";
+import { readmeProblems, readPin, stripMarkers } from "../scripts/readme.ts";
+import { bundlePackage, PACKAGE_ENTRY } from "./bundle.ts";
 
 const PKG = import.meta.dirname;
 const REPO = "https://github.com/NickCrews/nerdress";
@@ -77,25 +81,27 @@ const modelSha = createHash("sha256").update(model).digest("hex");
 const git = gitInfo();
 if (!git.sha) throw new Error("not a git checkout; the README cites the commit");
 if (git.dirty) log("warning: working tree has uncommitted changes; the README cites HEAD");
+if (suite === "full") {
+  const problems = readmeProblems();
+  const pinned = readPin().modelSha256;
+  if (modelSha !== pinned) {
+    problems.push(
+      `the model's sha256 ${modelSha} is not the one results/readme.json pins (${pinned}); ` +
+        "pass --model with the pinned run's model, or pin a run of this one",
+    );
+  }
+  if (problems.length) {
+    throw new Error(`README.md's numbers don't describe this model:\n- ${problems.join("\n- ")}`);
+  }
+}
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
-const entry = join(PKG, "index.ts");
-await build({
-  entryPoints: [entry],
-  outfile: join(out, "index.js"),
-  bundle: true,
-  format: "esm",
-  platform: "neutral",
-  target: "es2022",
-  define: { __NERDRESS_MODEL__: JSON.stringify(model.toString("base64")) },
-  absWorkingDir: ROOT,
-  logLevel: "warning",
-});
+await bundlePackage(model, join(out, "index.js"));
 
-const dts = ts.transpileDeclaration(readFileSync(entry, "utf8"), {
-  fileName: entry,
+const dts = ts.transpileDeclaration(readFileSync(PACKAGE_ENTRY, "utf8"), {
+  fileName: PACKAGE_ENTRY,
   compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.NodeNext },
   reportDiagnostics: true,
 });
@@ -125,7 +131,10 @@ ${config.trainExamples.toLocaleString("en-US")} examples of the default training
 ${config.seed}, at commit [\`${git.sha.slice(0, 7)}\`](${REPO}/tree/${git.sha}). That commit's
 \`src/data/\` and \`datasets/\` rebuild the training data from libpostal's 2017-03-04 snapshot.
 `;
-writeFileSync(join(out, "README.md"), readFileSync(join(ROOT, "README.md"), "utf8") + release);
+writeFileSync(
+  join(out, "README.md"),
+  stripMarkers(readFileSync(join(ROOT, "README.md"), "utf8")) + release,
+);
 
 writeFileSync(
   join(out, "LICENSE"),

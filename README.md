@@ -5,17 +5,21 @@ The name is NER (named-entity recognition) + address.
 US address parsing, ready for production:
 
 - **Run anywhere:** Pure javascript/typescript, no dependencies
-- **Accurate:** 99.29% of held-out test addresses parsed exactly right, 99.81% of words
-  labeled right.
-- **Small and fast:** ~370 KB gzipped including the model, ~100k/sec, nothing to download or set up.
+- **Accurate:** <!-- gen:exact-match -->98.87%<!-- /gen --> of held-out test addresses parsed exactly
+  right, <!-- gen:token-accuracy -->99.66%<!-- /gen --> of words labeled right.
+- **Small and fast:** ~<!-- gen:package-gzip -->293 KB<!-- /gen --> gzipped including the model,
+  ~<!-- gen:throughput -->50k<!-- /gen --> addresses/sec per thread, nothing to download or set up.
 - **Comprehensive:** Any US physical or mailing address: street addresses, PO boxes, rural and highway contract routes, general
   delivery, mileposts and military mail.
 - **Says how sure it is:** `confidence` is the probability that every span is right. Accept
-  confident parses and send the rest for review; the 90% most confident test parses are 99.97%
-  exactly right.
+  confident parses and send the rest for review; the 90% most confident test parses are
+  exactly right <!-- gen:exact-at-90 -->99.92%<!-- /gen --> of the time.
 - **Recognizes non-addresses:** junk is labeled `NotAddress` instead of being forced into a parse.
-- **Tolerates typos:** a misspelt word keeps its label ("vermn" is still the state); 98.56% of
-  test addresses with a typo are parsed exactly right.
+- **Tolerates typos:** a misspelt word keeps its label ("vermn" is still the state);
+  of test addresses with a typo, <!-- gen:typo-exact-match -->98.05%<!-- /gen --> are parsed exactly right.
+
+Accuracy is on <!-- gen:eval-examples -->20,000<!-- /gen --> held-out test examples, and speed on
+one thread of a <!-- gen:machine -->4-core Intel(R) Xeon(R) Processor @ 2.30GHz, Node v26.13.0<!-- /gen --> (run <!-- gen:run -->`2026-11-10T16-15-34__crf__full-test`<!-- /gen -->).
 
 ```js
 import { parse } from "nerdress";
@@ -46,7 +50,7 @@ npm install nerdress
   `text === input.slice(start, end)`. Spaces and commas between them have no label.
 - A label can occur more than once, e.g. two `OccupancyType` spans in "Apt 4B Floor 2".
 - Parsing has no side effects and needs no network or file access. The model is decoded on the
-  first call (about 10 ms).
+  first call (about <!-- gen:load-ms -->6 ms<!-- /gen -->).
 - To abstain, treat a parse as unusable when its confidence is below a threshold, or when every
   span is `NotAddress`.
 
@@ -91,6 +95,8 @@ or Attn) is `Recipient`; a name alone is `NotAddress`.
 
 The data is a custom blend from several different sources:
 
+<!-- gen:datasets -->
+
 | dataset            | share | training examples | source                                          | example                                  |
 | ------------------ | ----: | ----------------: | ----------------------------------------------- | ---------------------------------------- |
 | `openaddresses`    | 43.0% |           215,068 | libpostal: OpenAddresses government data        | 123 Main St, Springfield, IL 62704       |
@@ -102,14 +108,16 @@ The data is a custom blend from several different sources:
 | `junk`             |  1.2% |             5,806 | synthetic: text with no address                 | N/A; same as above; 555-0123             |
 | `ak-apoc`          |  0.9% |             4,297 | Alaska campaign finance, rule- and hand-labeled | 3705 Arctic, PMB 1579, Anchorage, Alaska |
 | `po-box`           |  1.7% |             8,602 | synthetic                                       | PO Box 123, P.O. Box, POB, Drawer        |
-| `rural-route`      |  0.9% |             4,301 | synthetic                                       | RR 2 Box 123, Rural Route 2, RFD 3       |
 | `milepost`         |  0.9% |             4,301 | synthetic                                       | Mile 14.5 Parks Hwy, MP 82 Sterling Hwy  |
+| `rural-route`      |  0.9% |             4,301 | synthetic                                       | RR 2 Box 123, Rural Route 2, RFD 3       |
 | `highway-contract` |  0.6% |             3,226 | synthetic                                       | HC 60 Box 4321, HCR 1 Box 45             |
 | `general-delivery` |  0.5% |             2,580 | synthetic                                       | General Delivery, Kenai, AK 99611        |
 | `military`         |  0.5% |             2,580 | synthetic                                       | PSC 1234, Box 5678, APO AE 09204         |
 | **total**          |  100% |       **500,000** |                                                 |                                          |
 
-Share is each dataset's weight in the training and eval sets. The shipped model is trained on the first 500,000 examples of the blend.
+<!-- /gen -->
+
+Share is each dataset's weight in the training and eval sets. The shipped model is trained on the first <!-- gen:train-examples -->500,000<!-- /gen --> examples of the blend.
 Most synthetic examples end with the city, state and ZIP of a real libpostal address.
 Random formatting noise (case, punctuation, spacing, typos) is added to the examples.
 
