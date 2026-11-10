@@ -14,7 +14,7 @@ Requires Node 24+ (TypeScript runs directly via type stripping).
 ```sh
 pnpm install
 pnpm data                          # download libpostal training data, build data/<split>/<dataset>.jsonl
-pnpm eval lookup --suite smoke     # train + measure the lookup baseline, print results
+pnpm eval crf --suite smoke        # train + measure the CRF, print results
 pnpm compare                       # latest run of every impl, side by side
 ```
 
@@ -57,21 +57,20 @@ export default impl;
 
 `parse` may return `{ spans, confidence }` instead of bare spans. Confidence is any number where
 higher means more likely exactly right (a CRF's sequence probability, say); returning it for every
-example turns on the risk–coverage metrics. `impls/lookup` returns the share of tokens it saw in
-training.
+example turns on the risk–coverage metrics. `impls/crf` returns the probability of its labeling.
 
 Training and inference run in separate processes and share only the model bytes, so
 serialization, size and load cost are part of what is measured.
 
 `src/tokens.ts` has a tokenizer (whitespace-delimited words, split where addresses often leave
 out a space: "Apt303", "St,Kenai", "N.Main") and `spansFromTokens` for token-level models;
-`impls/lookup` uses them. `impls/noop` returns nothing: its timings and memory are the
+`impls/crf` uses them. `impls/noop` returns nothing: its timings and memory are the
 harness's own floor, so side-by-side tables dim its column and never rank it best.
 
 The bundle-size metric bundles `impls/<name>/load.ts` if it exists, else `index.ts`. esbuild
 can't drop `train` from the exported object, so put `load` and everything it uses in `load.ts`
 (`export function load(model: Uint8Array): Parser`), import it into `index.ts`, and keep
-training-only code out of `load.ts`'s imports; `impls/lookup` does this. Runtime code must not
+training-only code out of `load.ts`'s imports; `impls/crf` does this. Runtime code must not
 import `node:` modules, or the browser bundle fails; esbuild doesn't catch uses of the `Buffer`
 or `process` globals, which fail only in a browser.
 
@@ -214,7 +213,7 @@ their id and are only compared with other test runs.
 splits in `$NERDRESS_DATA_DIR` instead of `data/` when that is set (downloads stay in `data/raw/`):
 
 ```sh
-NERDRESS_DATA_DIR=test/fixtures/data pnpm eval lookup --suite ci
+NERDRESS_DATA_DIR=test/fixtures/data pnpm eval crf --suite ci
 ```
 
 Runs of the `ci` suite are gitignored. `pnpm eval` exits non-zero when an impl throws, has parse
@@ -227,8 +226,7 @@ errors, or trains a different model twice from the same data.
 
 `pnpm docs` builds `docs/dist/index.html`, one self-contained page for users of the parsers:
 usage, the label set, what is measured and why, the training data, a comparison of every impl,
-and a playground that runs `crf` and `lookup` in the browser with their models embedded. Numbers
-come from the latest run of each impl in the suite (`--suite`, default `full`) and from
+and a playground that runs `crf` in the browser with its model embedded. Numbers come from the latest run of each impl in the suite (`--suite`, default `full`) and from
 `data/stats.json`. Models come from the `models/` cache for that suite, trained first if missing.
 Demo rows are seeded samples of the dev split, picked by running the models at build time; the
 references' columns come from their saved predictions (`results/predictions/`).

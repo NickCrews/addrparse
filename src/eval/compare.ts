@@ -35,7 +35,7 @@ const { values: opts, positionals } = parseArgs({
 
 const runs = loadRuns();
 if (runs.length === 0) {
-  console.error("no saved runs; try `pnpm eval lookup --suite smoke`");
+  console.error("no saved runs; try `pnpm eval crf --suite smoke`");
   process.exit(1);
 }
 

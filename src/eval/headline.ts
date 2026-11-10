@@ -4,7 +4,7 @@
  *
  * `noise` is the relative change at or below which a difference is shown as unchanged. Timing
  * and RSS numbers vary run to run on one machine; the V8 heap numbers barely do. The values come
- * from `pnpm noise lookup --last 6` over six `pnpm eval lookup --retrain` quick runs on an Apple
+ * from `pnpm noise <impl> --last 6` over six `--retrain` quick runs of a token-lookup parser on an Apple
  * M1 Max (10 cores, 1-minute load average about 5 from other work): each is the 90th percentile
  * of the relative change between two of those runs, rounded up, so about one in ten repeat runs
  * still shows a coloured change. Throughput gets up to 20%, as full runs moved 16%; "throughput/s

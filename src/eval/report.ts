@@ -204,7 +204,7 @@ export function comparabilityNotes(runs: readonly RunResult[]): string[] {
   return notes.map((n) => c.yellow(`note: ${n}`));
 }
 
-/** `2026-11-06T18-30-00__lookup__quick` → `11-06 18:30 lookup`. */
+/** `2026-11-06T18-30-00__crf__quick` → `11-06 18:30 crf`. */
 export function shortId(r: RunResult): string {
   const m = /^\d{4}-(\d\d-\d\d)T(\d\d)-(\d\d)/.exec(r.runId);
   return m ? `${m[1]} ${m[2]}:${m[3]}` : r.runId;

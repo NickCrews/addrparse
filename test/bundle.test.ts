@@ -6,10 +6,10 @@ import { bundleImpl } from "../src/eval/bundle.ts";
 import { implDir, importImpl, listImpls } from "../src/eval/impl.ts";
 
 test("bundles an impl's load.ts without its training code", async () => {
-  const b = await bundleImpl("lookup");
-  assert.equal(b.entry, "impls/lookup/load.ts");
+  const b = await bundleImpl("crf");
+  assert.equal(b.entry, "impls/crf/load.ts");
   assert.equal(b.includesTraining, false);
-  assert.ok(!("impls/lookup/index.ts" in b.inputs));
+  assert.ok(!("impls/crf/index.ts" in b.inputs));
   assert.ok("src/tokens.ts" in b.inputs);
   assert.ok(b.gzipBytes > 0 && b.gzipBytes < b.bytes);
 });
