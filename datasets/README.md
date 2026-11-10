@@ -122,8 +122,7 @@ labeled by an LLM correcting the parse of the model below to the conventions her
 
 Only the shapes that the published model (nerdress 0.1.0, trained with `ak-voterfile`) parses
 differently from the labels, or with confidence under 0.9, are kept, and of those with a dollar
-amount for a ZIP, the first 100. The build writes the count of each step to `ak-apoc.stats.json`.
-To rebuild:
+amount for a ZIP, the first 100. To rebuild:
 
 ```sh
 uv run scripts/ak-apoc/extract.py 20261106-191557 data/raw/apoc.jsonl

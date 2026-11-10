@@ -275,9 +275,6 @@ training examples per dataset. `test/readme.test.ts` fails when `README.md` diff
 weights changed since the pinned run. `pnpm package --suite full` refuses to build when that test
 would fail or when its model is not the pinned one.
 
-Any other numbers about a dataset belong in a file its build writes, such as
-`datasets/ak-apoc.stats.json`, not in prose.
-
 ## Data and licenses
 
 Licenses, the model attribution, and the rules for publishing data and models are in

@@ -3,8 +3,7 @@
  * finance data. See the `ak-apoc` section of datasets/README.md for what is kept and why.
  *
  *   node scripts/ak-apoc/build.ts --addresses data/raw/apoc.jsonl --model <crf model.bin> \
- *     [--hand scripts/ak-apoc/hand.jsonl] [--out datasets/ak-apoc.jsonl] [--residue <path>] \
- *     [--stats datasets/ak-apoc.stats.json]
+ *     [--hand scripts/ak-apoc/hand.jsonl] [--out datasets/ak-apoc.jsonl] [--residue <path>]
  *
  * 1. Each row is rendered as one line: `address, city, state zip`. The locality is left off
  *    when the address line already ends with it.
@@ -14,10 +13,7 @@
  *    for shapes the rules don't cover. Shapes in neither go to `--residue` for labeling.
  * 4. A labeled shape is kept when the `--model` parser gets it wrong: a different span set, or
  *    a confidence below 0.9. Of the lines with a dollar amount for a ZIP, the first 100 are kept.
- *
- * `--stats` gets the counts of each step and the model's sha256 (`Stats` below).
  */
-import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { load } from "../../impls/crf/load.ts";
@@ -44,7 +40,6 @@ const { values } = parseArgs({
     hand: { type: "string", default: "scripts/ak-apoc/hand.jsonl" },
     out: { type: "string", default: "datasets/ak-apoc.jsonl" },
     residue: { type: "string", default: "data/raw/apoc-residue.jsonl" },
-    stats: { type: "string", default: "datasets/ak-apoc.stats.json" },
   },
 });
 if (!values.model) throw new Error("--model <crf model .bin> is required");
@@ -143,8 +138,7 @@ for (const row of rows) {
   else prev.n += r.n;
 }
 
-const modelBytes = readFileSync(values.model);
-const parser = load(new Uint8Array(modelBytes));
+const parser = load(new Uint8Array(readFileSync(values.model)));
 const sameSpans = (a: readonly Span[], b: readonly Span[]) =>
   a.length === b.length &&
   a.every((s, k) => s.start === b[k]!.start && s.end === b[k]!.end && s.label === b[k]!.label);
@@ -161,30 +155,7 @@ function asPairs(text: string, spans: readonly Span[]): [string, Label][] | unde
 const MAX_MONEY_ZIP = 100;
 const kept: string[] = [];
 const residue: string[] = [];
-interface Stats {
-  /** sha256 of `--model`. */
-  model: string;
-  /** Distinct shapes among the rendered rows. */
-  shapes: number;
-  /** Shapes labeled by rules.ts. */
-  rules: number;
-  /** Shapes labeled by a `--hand` line. */
-  hand: number;
-  /** Shapes neither labels, written to `--residue` and left out. */
-  residue: number;
-  /** Examples written to `--out`: `wrong` plus `unsure`. */
-  kept: number;
-  /** Kept because the model's span set differs from the labels. */
-  wrong: number;
-  /** Kept because the model's confidence was under 0.9. */
-  unsure: number;
-  /** Labeled shapes the model got wrong or was unsure of with a dollar amount for a ZIP. */
-  moneyZips: number;
-  /** Of `moneyZips`, how many are kept. */
-  moneyZipsKept: number;
-}
-const stats: Stats = {
-  model: createHash("sha256").update(modelBytes).digest("hex"),
+const stats = {
   shapes: byShape.size,
   rules: 0,
   hand: 0,
@@ -193,7 +164,6 @@ const stats: Stats = {
   wrong: 0,
   unsure: 0,
   moneyZips: 0,
-  moneyZipsKept: 0,
 };
 for (const r of byShape.values()) {
   let spans: Span[];
@@ -217,10 +187,7 @@ for (const r of byShape.values()) {
   if (!wrong && !unsure) continue;
   // Shapes that differ only in the street before a dollar amount in the ZIP field teach one
   // thing; keep the first MAX_MONEY_ZIP.
-  if (/ \$[\d,.]+$/.test(r.text)) {
-    if (++stats.moneyZips > MAX_MONEY_ZIP) continue;
-    stats.moneyZipsKept++;
-  }
+  if (/ \$[\d,.]+$/.test(r.text) && ++stats.moneyZips > MAX_MONEY_ZIP) continue;
   if (wrong) stats.wrong++;
   else stats.unsure++;
   stats.kept++;
@@ -228,5 +195,4 @@ for (const r of byShape.values()) {
 }
 writeFileSync(values.out, kept.join("\n") + "\n");
 writeFileSync(values.residue, residue.join("\n") + (residue.length ? "\n" : ""));
-writeFileSync(values.stats, JSON.stringify(stats, null, 2) + "\n");
 console.log(stats);
