@@ -32,12 +32,47 @@ pnpm compare                       # latest run of every impl, side by side
 | `pnpm compare <impl>`                              | that impl's last two runs, with changes                                   |
 | `pnpm compare <runA> <runB>`                       | two runs (id, id prefix, impl name, or path)                              |
 | `pnpm errors <run> [--label X] [--slice s]`        | misparsed examples as token / gold / predicted tables                     |
+| `pnpm slices <run> [--by kind,error] [--json]`     | training mix and accuracy by dimension; crossed with `--by a,b`           |
+| `pnpm slices <runA> <runB>`                        | the same, with B's change from A                                          |
 | `pnpm noise <impl...> [--suite quick] [--last 5]`  | run-to-run spread of each metric vs its noise threshold                   |
 | `pnpm data:override <id\|text>...`                 | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels      |
 | `pnpm docs [--suite full]`                         | user docs as one offline HTML file, `docs/dist/index.html`                |
+| `pnpm readme [--check]`                            | README.md's dataset and breakdown tables, from the latest crf test run    |
 
 `--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
 or red only when larger than the metric's noise threshold; smaller ones are dimmed.
+
+## Breaking down data and accuracy
+
+`src/eval/dimensions.ts` describes each example along a few dimensions, read from its gold
+labels, dataset, noise and notes:
+
+| dimension | values                                                                                       |
+| --------- | -------------------------------------------------------------------------------------------- |
+| `kind`    | address type: street, po-box, rural-route, highway-contract, military, milepost, …           |
+| `error`   | typo, order, joined, line-break, punctuation, case, missing-city, missing-state, missing-zip |
+| `extra`   | text besides the address: recipient, other-text, only-other-text                             |
+| `region`  | Census region from the state or ZIP, with Alaska on its own                                  |
+| `state`   | the state, from the state's text or the ZIP                                                  |
+| `source`  | dataset                                                                                      |
+| `noise`   | each formatting noise transform                                                              |
+| `gold`    | whether the gold labels rest on a labeling heuristic                                         |
+
+Each value is a slice (`kind=milepost`, usable with `pnpm errors --slice`), and each run saves
+the training set's count of every value (`data.trainMix`). `pnpm slices <run>` puts the two side
+by side: training share, eval examples, and exact match with a 95% interval. It recomputes from the
+current data and the run's saved predictions when their hashes match, so a dimension added later
+works on old runs, and `--by kind,error` crosses dimensions. `--sort worst --min 50` finds weak
+spots; `--json` is for scripts.
+
+```sh
+pnpm slices crf --by kind                       # by address type
+pnpm slices crf --by region,kind --sort worst   # weakest region and type combinations
+pnpm slices <before> <after> --by error         # what a change did to each error type
+```
+
+To add a dimension, append to `DIMENSIONS`. To show it in README.md, add it to
+`README_DIMENSIONS` in `docs/readme.ts`; the website shows every dimension.
 
 ## Adding an implementation
 
@@ -98,33 +133,33 @@ next to trained impls. Package and model versions are saved in the run's `metric
 Every measurement runs in a fresh `node --expose-gc` process (`src/eval/child.ts`), so JIT state
 and heap from one measurement don't affect another.
 
-| metric                    | how it's measured                                                                                                             |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| exact match               | share of eval examples whose predicted span set equals gold. The headline number.                                             |
-| token accuracy            | share of tokens (`src/tokens.ts`, which splits "Apt4" into "Apt" "4") whose label matches gold                                |
-| span P/R/F1               | a span counts only if start, end and label all match; also per label                                                          |
-| coarse exact match        | exact match with the street, the unit and the PO box each collapsed to one label, as libpostal has                            |
-| slices                    | exact match on subsets (`src/eval/slices.ts`), e.g. PO boxes, all-caps, junk-only, embedded, `noise=none`, one per noise type |
-| exact @ N% coverage       | exact match among the N% of examples with the highest confidence (only with confidences)                                      |
-| risk–coverage AURC        | mean error rate among the k most confident examples, over every k; lower is better                                            |
-| coverage @ 99% exact      | share of examples kept by the lowest confidence threshold at which exact match is ≥ 99%                                       |
-| junk abstained            | share of junk-only examples (all gold spans NotAddress) with no predicted label but NotAddress                                |
-| addresses abstained       | share of the other examples with no predicted label but NotAddress; the cost of abstaining                                    |
-| latency p50/p99, µs/token | one thread, after warmup passes; each `parse` call timed individually                                                         |
-| throughput/s              | N worker threads, each with its own model, parsing back to back for a fixed time; median of repeats                           |
-| model size, gzip          | bytes returned by `train`, raw and gzip -9                                                                                    |
-| bundle size, gzip         | `load.ts` (else `index.ts`) bundled for the browser by esbuild, minified; raw and gzip -9                                     |
-| model load ms             | wall time of `load(bytes)`                                                                                                    |
-| model heap                | heap used after `load`, minus before (both after GC)                                                                          |
-| infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                                                      |
-| infer heap peak           | peak V8 heap + external memory over the same window, minus before; low by older garbage V8 sweeps meanwhile                   |
-| train seconds, examples/s | wall time of `train()`, excluding data loading                                                                                |
-| train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                                                   |
-| train heap peak           | peak V8 heap + external memory during `train()`, minus before; low by older garbage V8 sweeps meanwhile                       |
-| train allocated           | V8 heap + external bytes allocated during `train()`, including garbage                                                        |
-| determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                                                 |
-| learning curve            | exact match after training on fewer examples (`full` suite)                                                                   |
-| code lines                | lines of `impls/<name>/**/*.ts`                                                                                               |
+| metric                    | how it's measured                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| exact match               | share of eval examples whose predicted span set equals gold. The headline number.                                              |
+| token accuracy            | share of tokens (`src/tokens.ts`, which splits "Apt4" into "Apt" "4") whose label matches gold                                 |
+| span P/R/F1               | a span counts only if start, end and label all match; also per label                                                           |
+| coarse exact match        | exact match with the street, the unit and the PO box each collapsed to one label, as libpostal has                             |
+| slices                    | exact match on subsets (`src/eval/slices.ts`): one per value of each dimension (`kind=po-box`, `error=typo`), and a few others |
+| exact @ N% coverage       | exact match among the N% of examples with the highest confidence (only with confidences)                                       |
+| risk–coverage AURC        | mean error rate among the k most confident examples, over every k; lower is better                                             |
+| coverage @ 99% exact      | share of examples kept by the lowest confidence threshold at which exact match is ≥ 99%                                        |
+| junk abstained            | share of junk-only examples (all gold spans NotAddress) with no predicted label but NotAddress                                 |
+| addresses abstained       | share of the other examples with no predicted label but NotAddress; the cost of abstaining                                     |
+| latency p50/p99, µs/token | one thread, after warmup passes; each `parse` call timed individually                                                          |
+| throughput/s              | N worker threads, each with its own model, parsing back to back for a fixed time; median of repeats                            |
+| model size, gzip          | bytes returned by `train`, raw and gzip -9                                                                                     |
+| bundle size, gzip         | `load.ts` (else `index.ts`) bundled for the browser by esbuild, minified; raw and gzip -9                                      |
+| model load ms             | wall time of `load(bytes)`                                                                                                     |
+| model heap                | heap used after `load`, minus before (both after GC)                                                                           |
+| infer RSS over baseline   | peak RSS during `load` and one parse of each eval text, minus RSS before                                                       |
+| infer heap peak           | peak V8 heap + external memory over the same window, minus before; low by older garbage V8 sweeps meanwhile                    |
+| train seconds, examples/s | wall time of `train()`, excluding data loading                                                                                 |
+| train RSS over baseline   | peak RSS during `train()`, minus RSS before                                                                                    |
+| train heap peak           | peak V8 heap + external memory during `train()`, minus before; low by older garbage V8 sweeps meanwhile                        |
+| train allocated           | V8 heap + external bytes allocated during `train()`, including garbage                                                         |
+| determinism               | train twice, compare sha256 of the model bytes (`full` suite)                                                                  |
+| learning curve            | exact match after training on fewer examples (`full` suite)                                                                    |
+| code lines                | lines of `impls/<name>/**/*.ts`                                                                                                |
 
 Gold NotAddress spans break at `,` and `;` the way `spansFromTokens` does ("Baker, Sandra" is two
 spans), so exact match on junk needs those spans; junk abstained only needs no other label.
@@ -196,7 +231,7 @@ pnpm eval crf --mix milepost=0.1         # five times the default milepost share
 | `eval.config.ts`                                                                                | suites: train/eval sizes, seed, latency calls, throughput threads, determinism, learning curve; dataset weights and named blends |
 | `datasets/`                                                                                     | added datasets: generators (`.ts`) and hand-labeled examples (`.jsonl`)                                                          |
 | `src/eval/headline.ts`                                                                          | which metrics the tables show, their order, format and noise thresholds (`pnpm noise`)                                           |
-| `src/eval/slices.ts`                                                                            | accuracy subsets                                                                                                                 |
+| `src/eval/dimensions.ts`, `src/eval/slices.ts`                                                  | the dimensions the training mix and accuracy are broken down by; other accuracy subsets                                          |
 | `src/data/refine.ts`                                                                            | how libpostal's labels map to the output labels                                                                                  |
 | `src/labels.ts`                                                                                 | the label set                                                                                                                    |
 | `pnpm data:override osm:6` (an example id, or a text substring) prints entries with the current |
@@ -257,7 +292,9 @@ link is how the package meets ODbL §4.6, so build from a clean commit that is p
 public repository. `test/package.test.ts` builds the package from the CI fixture and imports it.
 
 Before a release, score the model on the test split once (`pnpm eval crf --suite full --split
-test`) and update the numbers in `README.md` and `docs/page.ts`.
+test`), run `pnpm readme` to regenerate the README's dataset and breakdown tables from that run,
+and update the other numbers in `README.md` and `docs/page.ts`. A test fails while the generated
+tables are out of date with the latest such run.
 
 ## Data and licenses
 

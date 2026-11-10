@@ -18,6 +18,7 @@ import { build } from "esbuild";
 import { SUITES, type SuiteName } from "../eval.config.ts";
 import { defaultWeights, hashSplit, loadExamples } from "../src/data/load.ts";
 import { DATA_STATS_PATH, ROOT } from "../src/data/paths.ts";
+import { mixOfSplit } from "../src/eval/dimensions.ts";
 import { implSourceHash, listImpls } from "../src/eval/impl.ts";
 import { ensureModel, gitInfo } from "../src/eval/models.ts";
 import { loadRuns, trainBlendOf, type RunResult } from "../src/eval/results.ts";
@@ -125,6 +126,9 @@ const stats = existsSync(DATA_STATS_PATH)
   ? (JSON.parse(readFileSync(DATA_STATS_PATH, "utf8")) as DataStats)
   : undefined;
 
+// The training mix of the embedded models: the suite's training prefix of the default blend.
+const trainMix = await mixOfSplit("train", config.trainExamples, defaultWeights());
+
 const git = gitInfo();
 const ctx: PageContext = {
   suite,
@@ -136,6 +140,7 @@ const ctx: PageContext = {
   runNotes,
   embedded: embeddedSizes,
   stats,
+  trainMix,
   attribution: readAttribution(),
   demo: { sets: demo.sets.length, rows: Object.keys(demo.rows).length },
   generated: {

@@ -5,6 +5,7 @@ import { RUNS_DIR } from "../data/paths.ts";
 import type { ScoredParse } from "../types.ts";
 import type { AccuracyMetrics } from "./accuracy.ts";
 import type { BundleMetrics } from "./bundle.ts";
+import type { Mix } from "./dimensions.ts";
 
 /** Everything one `pnpm eval` run of one implementation measured. Saved to results/runs/. */
 export interface RunResult {
@@ -23,13 +24,15 @@ export interface RunResult {
   /**
    * `trainHash` is null for a reference impl, which is trained elsewhere. `trainBlend` names the
    * training blend (`blendLabel`; absent means "default") and `trainWeights` its resolved
-   * weights; the eval set always uses the default blend.
+   * weights; the eval set always uses the default blend. `trainMix` counts the training
+   * examples with each value of each dimension (`dimensions.ts`).
    */
   data: {
     trainHash: string | null;
     evalHash: string;
     trainBlend?: string;
     trainWeights?: Record<string, number>;
+    trainMix?: Mix;
   };
   machine: {
     cpu: string;

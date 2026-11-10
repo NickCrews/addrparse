@@ -39,6 +39,7 @@ import { MODELS_DIR, PREDICTIONS_DIR, type Split } from "../data/paths.ts";
 import type { Example, ReferenceImpl, ReferencePrediction } from "../types.ts";
 import { scoreAll, TARGET_EXACT_MATCH } from "./accuracy.ts";
 import { bundleImpl } from "./bundle.ts";
+import { mixOfSplit, type Mix } from "./dimensions.ts";
 import type { LatencyArgs, PredictArgs, ModelArgs, ThroughputArgs } from "./child.ts";
 import {
   ensureModel as ensureCachedModel,
@@ -405,6 +406,7 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
       evalHash,
       ...(trainBlendName === "default" ? {} : { trainBlend: trainBlendName }),
       trainWeights,
+      trainMix: await trainMix(),
     },
     machine,
     metrics,
@@ -413,6 +415,10 @@ async function evalImpl(impl: string, evalExamples: readonly Example[], evalHash
   log(c.dim(`  saved ${saveRun(run)} (${secs(tImpl)})`));
   return { run, previous };
 }
+
+/** The training set's mix by dimension; the same for every impl of this invocation. */
+let trainMixCache: Promise<Mix> | undefined;
+const trainMix = () => (trainMixCache ??= mixOfSplit("train", config.trainExamples, trainWeights));
 
 const evalExamples = await loadExamples(split, config.evalExamples);
 const evalHash = await hashSplit(split, config.evalExamples);

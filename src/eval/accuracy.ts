@@ -22,7 +22,7 @@
 import { LABEL_NAMES, type Label } from "../labels.ts";
 import { labelAt, tokenize } from "../tokens.ts";
 import type { Example, Span } from "../types.ts";
-import { isJunkOnly, SLICES } from "./slices.ts";
+import { isJunkOnly, SLICES, slicesOf } from "./slices.ts";
 
 export interface Prf {
   precision: number;
@@ -331,12 +331,19 @@ export function scoreAll(
     }
   }
 
+  const bySlice = new Map<string, ExampleScore[]>(SLICES.map((s) => [s.name, []]));
+  examples.forEach((ex, i) => {
+    for (const name of slicesOf(ex)) {
+      let group = bySlice.get(name);
+      if (!group) bySlice.set(name, (group = []));
+      group.push(scores[i]!);
+    }
+  });
   const slices: Record<string, SliceMetrics> = {};
-  for (const slice of SLICES) {
-    const subset = scores.filter((_, i) => slice.test(examples[i]!));
+  for (const [name, subset] of bySlice) {
     if (subset.length === 0) continue;
     const { examples: n, exactMatch, tokenAccuracy, spanF1 } = aggregate(subset);
-    slices[slice.name] = { examples: n, exactMatch, tokenAccuracy, spanF1 };
+    slices[name] = { examples: n, exactMatch, tokenAccuracy, spanF1 };
   }
 
   const coarse = aggregate(

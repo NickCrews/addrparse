@@ -127,16 +127,17 @@ export function detailTables(
   if (which.includes("labels") && labelRows.length)
     out.push(renderTable(["span F1 by label", "gold", ...labels], labelRows));
 
-  const sliceRows = SLICES.filter((s) => runs.some((r) => r.metrics.accuracy?.slices[s.name])).map(
-    (s) => {
-      const n = runs.map((r) => r.metrics.accuracy?.slices[s.name]?.examples).find((x) => x);
-      return [
-        s.name,
-        String(n ?? 0),
-        ...runs.map((r) => pct(r.metrics.accuracy?.slices[s.name]?.exactMatch)),
-      ];
-    },
-  );
+  // States are many small rows; `pnpm slices <run> --by state` has them.
+  const sliceRows = SLICES.filter(
+    (s) => !s.name.startsWith("state=") && runs.some((r) => r.metrics.accuracy?.slices[s.name]),
+  ).map((s) => {
+    const n = runs.map((r) => r.metrics.accuracy?.slices[s.name]?.examples).find((x) => x);
+    return [
+      s.name,
+      String(n ?? 0),
+      ...runs.map((r) => pct(r.metrics.accuracy?.slices[s.name]?.exactMatch)),
+    ];
+  });
   if (which.includes("slices") && sliceRows.length) {
     out.push(renderTable(["exact match by slice", "examples", ...labels], sliceRows));
   }

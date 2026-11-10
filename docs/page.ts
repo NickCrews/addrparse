@@ -5,8 +5,10 @@
  */
 import { LABELS, LABEL_NAMES, type Label } from "../src/labels.ts";
 import { TARGET_EXACT_MATCH } from "../src/eval/accuracy.ts";
+import { DIMENSIONS, orderedValues, type Dimension, type Mix } from "../src/eval/dimensions.ts";
 import { HEADLINE, type Metric } from "../src/eval/headline.ts";
 import type { RunResult } from "../src/eval/results.ts";
+import { SLICES, sliceName } from "../src/eval/slices.ts";
 import { DATASET_WEIGHTS } from "../eval.config.ts";
 import { esc } from "./html.ts";
 import { IMPL_NOTES } from "./impl-notes.ts";
@@ -51,6 +53,8 @@ export interface PageContext {
   /** Models embedded in the page: raw and gzip bytes. */
   embedded: Record<string, { bytes: number; gzipBytes: number }>;
   stats?: DataStats;
+  /** Training examples by value of each dimension, for the suite's training set. */
+  trainMix: Mix;
   /** The model attribution paragraph from LICENSING.md, as plain text. */
   attribution: string;
   /** Preset sets sampled from the dev split, and the distinct texts in them. */
@@ -306,6 +310,35 @@ ${table(["label", "spans"], labelRows, { align: ["l", "r"] })}
 ${table(["reason", "lines"], rejectedRows, { align: ["l", "r"] })}`;
 }
 
+/** Dimensions shown as their own tables; source and noise have tables of their own above. */
+const MIX_DIMENSIONS = DIMENSIONS.filter((d) => d.name !== "source" && d.name !== "noise");
+
+const sharesNote = (d: Dimension) =>
+  d.exclusive ? "" : " An example can have several values, so shares add up to more than 100%.";
+
+function mixTables(ctx: PageContext): string {
+  const mix = ctx.trainMix;
+  const tables = MIX_DIMENSIONS.map((d) => {
+    const counts = mix.counts[d.name] ?? {};
+    const rows = orderedValues(d, counts).map((v) => [
+      code(v),
+      esc(d.notes?.[v] ?? ""),
+      int(counts[v] ?? 0),
+      pct((counts[v] ?? 0) / mix.examples),
+    ]);
+    const body = `<p>${esc(d.description)}.${sharesNote(d)}</p>
+${table(["value", "meaning", "examples", "share"], rows, { align: ["l", "l", "r", "r"] })}`;
+    return d.name === "kind"
+      ? `<h4>${esc(d.title)}</h4>${body}`
+      : `<details><summary>${esc(d.title)}</summary>${body}</details>`;
+  });
+  return `<p>The ${int(mix.examples)} training examples of the ${code(ctx.suite)} suite, by the
+dimensions of <code>src/eval/dimensions.ts</code>. Each example is put in a category by its gold
+labels, dataset and formatting noise. The Models tab has each parser's accuracy on the same
+categories.</p>
+${tables.join("\n")}`;
+}
+
 function goldSection(s: DataStats | undefined): string {
   const all = Object.entries(s?.notes ?? {}).sort((a, b) => b[1] - a[1]);
   const notes = all.filter(([n]) => !n.startsWith("dropped:"));
@@ -388,6 +421,9 @@ TypeScript parsers; the references run as Python subprocesses, whose timings are
 <h2 id="metrics-data">Training data</h2>
 ${s ? trainingData(s, ctx.suite) : "<p>data/stats.json not found when this page was built.</p>"}
 
+<h3 id="metrics-mix">Training mix by type</h3>
+${mixTables(ctx)}
+
 <h2 id="metrics-gold">Gold labels</h2>
 ${goldSection(s)}
 
@@ -460,15 +496,41 @@ function detail(ctx: PageContext): string {
       return p && p.gold + p.predicted > 0 ? pct(p.f1, 1) : "–";
     }),
   ]);
-  const sliceNames = Object.keys(runs[0]?.metrics.accuracy?.slices ?? {});
-  const slices = sliceNames.map((n) => [
-    code(n),
-    int(runs[0]!.metrics.accuracy!.slices[n]!.examples),
-    ...runs.map((r) => {
-      const s = r.metrics.accuracy!.slices[n];
+  const names = runs.map((r) => esc(r.impl));
+  const evalCount = (name: string) =>
+    runs.map((r) => r.metrics.accuracy!.slices[name]?.examples).find((n) => n !== undefined);
+  const exactCells = (name: string) =>
+    runs.map((r) => {
+      const s = r.metrics.accuracy!.slices[name];
       return s ? pct(s.exactMatch, 1) : "–";
-    }),
-  ]);
+    });
+  const dimensionTables = DIMENSIONS.map((d) => {
+    const counts = ctx.trainMix.counts[d.name] ?? {};
+    const evaluated = Object.fromEntries(
+      d.values.filter((v) => evalCount(sliceName(d.name, v)) !== undefined).map((v) => [v, 1]),
+    );
+    const rows = orderedValues(d, counts, evaluated).map((v) => {
+      const n = evalCount(sliceName(d.name, v));
+      const cells = [
+        code(v),
+        pct((counts[v] ?? 0) / ctx.trainMix.examples),
+        n === undefined ? "0" : int(n),
+        ...exactCells(sliceName(d.name, v)),
+      ];
+      return n === undefined || n < 30
+        ? cells.map((c, i) => (i === 0 ? c : `<span class="dim">${c}</span>`))
+        : cells;
+    });
+    return `<details${d.name === "kind" ? " open" : ""}><summary>Exact match ${esc(d.title.replace(/^By/, "by"))}</summary>
+<p>${esc(d.description)}.${sharesNote(d)}</p>
+${table(["value", "training share", "dev examples", ...names], rows, { align: ["l", "r", "r", ...runs.map(() => "r" as const)] })}</details>`;
+  });
+  const dimensionSlices = new Set(
+    DIMENSIONS.flatMap((d) => d.values.map((v) => sliceName(d.name, v))),
+  );
+  const otherSlices = SLICES.filter(
+    (s) => !dimensionSlices.has(s.name) && evalCount(s.name) !== undefined,
+  ).map((s) => [code(s.name), int(evalCount(s.name)!), ...exactCells(s.name)]);
   const curved = ctx.runs.filter((r) => r.metrics.learningCurve?.length);
   const sizes = [
     ...new Set(curved.flatMap((r) => r.metrics.learningCurve!.map((p) => p.trainExamples))),
@@ -480,13 +542,17 @@ function detail(ctx: PageContext): string {
       return p ? pct(p.exactMatch, 2) : "–";
     }),
   ]);
-  const names = runs.map((r) => esc(r.impl));
   return `
 <details><summary>Span F1 per label</summary>
 ${table(["label", ...names], perLabel, { align: ["l", ...runs.map(() => "r" as const)] })}</details>
-<details><summary>Exact match per slice</summary>
-<p>Slices are subsets of the dev eval set (<code>src/eval/slices.ts</code>): by source, by which labels the gold has, by formatting noise, by whether the gold rests on a heuristic.</p>
-${table(["slice", "examples", ...names], slices, { align: ["l", "r", ...runs.map(() => "r" as const)] })}</details>
+<h3 id="models-breakdown">Accuracy by type</h3>
+<p>Exact match on parts of the dev set, by the dimensions of <code>src/eval/dimensions.ts</code>,
+next to each part's share of the training set (the Metrics tab describes the training mix). Dimmed
+rows have under 30 dev examples, too few to compare parsers on.</p>
+${dimensionTables.join("\n")}
+<details><summary>Exact match on other slices</summary>
+<p>Subsets of the dev set by which labels the gold has and how the text is written (<code>src/eval/slices.ts</code>).</p>
+${table(["slice", "dev examples", ...names], otherSlices, { align: ["l", "r", ...runs.map(() => "r" as const)] })}</details>
 ${
   curve.length
     ? `<details><summary>Exact match by training-set size</summary>
