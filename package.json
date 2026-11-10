@@ -14,6 +14,7 @@
     "noise": "node src/eval/noise.ts",
     "docs": "node docs/build.ts",
     "package": "node package/build.ts",
+    "readme": "node scripts/readme.ts",
     "test": "node --test 'test/**/*.test.ts'",
     "typecheck": "tsc",
     "fmt": "oxfmt",

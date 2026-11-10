@@ -76,8 +76,8 @@ left out. There is one example per shape: lines that differ only in their digits
 file's address lines joined with `, `, then the city, state and ZIP (left off a random 15% of
 one-line addresses, and when the line already ends with them).
 
-Of its 23,919 examples, 78% were labeled by rules written for these shapes and the rest by an
-LLM following the conventions below. The rules send any line they can't fully explain to the LLM, but
+Most of its examples were labeled by rules written for these shapes and the rest by an LLM
+following the conventions below. The rules send any line they can't fully explain to the LLM, but
 neither half has been checked line by line by a person, so expect some wrong labels.
 
 Labeling conventions beyond `src/labels.ts`:
@@ -114,15 +114,15 @@ Alaska and the rest elsewhere in the US. Non-US addresses are left out.
 
 Each row is rendered as `address, city, state zip`, or as the address alone when it already ends
 with its city, state or ZIP. The state is APOC's full name ("Alaska"). Rows that differ only in
-their digits or case count as one shape, and the most frequent row of each shape is kept: 129,559
-shapes. The fields are labeled by the rules in `scripts/ak-apoc/rules.ts` where the shape is one
-they cover (113,276 shapes), otherwise by `scripts/ak-apoc/hand.jsonl`: 1,143 lines, the most
-frequent of each coarse shape of the rest, labeled by an LLM correcting the parse of the model below
-to the conventions here and in `ak-voterfile`. The other 15,140 shapes are left out.
+their digits or case count as one shape, and the most frequent row of each shape is kept. The
+fields are labeled by the rules in `scripts/ak-apoc/rules.ts` where the shape is one they cover,
+otherwise by `scripts/ak-apoc/hand.jsonl`: the most frequent of each coarse shape of the rest,
+labeled by an LLM correcting the parse of the model below to the conventions here and in
+`ak-voterfile`. Shapes in neither are left out.
 
 Only the shapes that the published model (nerdress 0.1.0, trained with `ak-voterfile`) parses
-differently from the labels, or with confidence under 0.9, are kept: 4,761 examples, of them 100 of
-the 682 with a dollar amount for a ZIP. To rebuild:
+differently from the labels, or with confidence under 0.9, are kept, and of those with a dollar
+amount for a ZIP, the first 100. To rebuild:
 
 ```sh
 uv run scripts/ak-apoc/extract.py 20261106-191557 data/raw/apoc.jsonl

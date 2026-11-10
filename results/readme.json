@@ -1,0 +1,23 @@
+{
+  "run": "2026-11-10T16-15-34__crf__full-test",
+  "implHash": "799048a3675c2ca6",
+  "inputsHash": "33f324c066a632b3",
+  "modelSha256": "1d8ed62f921e98b4968d4309aa7a286a53fd3074ac08475c977b62ee3c49d1aa",
+  "packageGzipBytes": 299894,
+  "trainExamples": {
+    "openaddresses": 215068,
+    "osm": 163452,
+    "ways": 36561,
+    "ak-voterfile": 21483,
+    "places": 19356,
+    "po-box": 8602,
+    "embedded": 8387,
+    "junk": 5806,
+    "ak-apoc": 4297,
+    "milepost": 4301,
+    "rural-route": 4301,
+    "highway-contract": 3226,
+    "general-delivery": 2580,
+    "military": 2580
+  }
+}

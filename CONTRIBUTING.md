@@ -35,6 +35,7 @@ pnpm compare                       # latest run of every impl, side by side
 | `pnpm noise <impl...> [--suite quick] [--last 5]`  | run-to-run spread of each metric vs its noise threshold                   |
 | `pnpm data:override <id\|text>...`                 | `overrides/gold.jsonl` lines for raw lines, to hand-fix their labels      |
 | `pnpm docs [--suite full]`                         | user docs as one offline HTML file, `docs/dist/index.html`                |
+| `pnpm readme [--pin <run>]`                        | fill README.md's numbers from the run `results/readme.json` pins          |
 
 `--detail` adds span F1 per label, exact match per slice and the learning curve. Changes are green
 or red only when larger than the metric's noise threshold; smaller ones are dimmed.
@@ -254,8 +255,23 @@ and `LICENSE` with the model attribution from LICENSING.md. The commit
 link is how the package meets ODbL §4.6, so build from a clean commit that is pushed to the
 public repository. `test/package.test.ts` builds the package from the CI fixture and imports it.
 
-Before a release, score the model on the test split once (`pnpm eval crf --suite full --split
-test`) and update the numbers in `README.md` and `docs/page.ts`.
+## README numbers
+
+Every measured number in `README.md` sits between `<!-- gen:<name> -->` and `<!-- /gen -->`
+markers, and `pnpm readme` fills them from the run that `results/readme.json` pins
+(`scripts/readme.ts` defines each name). To quote a new model, score it on the test split once
+and pin that run:
+
+```sh
+pnpm eval crf --suite full --split test
+pnpm readme --pin <its run id>             # needs data/ and the run's cached model
+```
+
+`--pin` also records the model's sha256, the gzipped size of the package built from it and the
+training examples per dataset. `test/readme.test.ts` fails when `README.md` differs from what
+`pnpm readme` writes, or when the crf code, shared `src/`, `datasets/`, `overrides/` or the dataset
+weights changed since the pinned run. `pnpm package --suite full` refuses to build when that test
+would fail or when its model is not the pinned one.
 
 ## Data and licenses
 
